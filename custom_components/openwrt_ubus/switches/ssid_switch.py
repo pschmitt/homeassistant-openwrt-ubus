@@ -57,10 +57,18 @@ async def async_setup_entry(
         _LOGGER.warning("No wireless interfaces found on %s", entry.data[CONF_HOST])
         return
 
+    # Group UCI sections by SSID name so we get one switch per SSID
+    # (each SSID typically has one section per radio band).
+    ssid_groups: dict[str, list[str]] = {}
+    for section_name, iface_data in ssid_data.items():
+        if not isinstance(iface_data, dict) or iface_data.get("mode", "ap") != "ap":
+            continue
+        ssid = iface_data.get("ssid", section_name)
+        ssid_groups.setdefault(ssid, []).append(section_name)
+
     entities = [
-        OpenwrtSSIDSwitch(coordinator, section_name, iface_data, entry)
-        for section_name, iface_data in ssid_data.items()
-        if isinstance(iface_data, dict) and iface_data.get("mode", "ap") == "ap"
+        OpenwrtSSIDSwitch(coordinator, ssid, sections, entry)
+        for ssid, sections in ssid_groups.items()
     ]
 
     if entities:
@@ -73,7 +81,11 @@ async def async_setup_entry(
 
 
 class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
-    """Switch to enable or disable a WiFi SSID on an OpenWrt AP."""
+    """Switch to enable or disable a WiFi SSID on an OpenWrt AP.
+
+    One switch per SSID; toggling it updates all UCI sections that share
+    that SSID name (i.e. the same network on both 2.4 GHz and 5 GHz).
+    """
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
@@ -81,27 +93,26 @@ class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
     def __init__(
         self,
         coordinator: SharedDataUpdateCoordinator,
-        section_name: str,
-        iface_data: dict,
+        ssid: str,
+        sections: list[str],
         entry: ConfigEntry,
     ) -> None:
         """Initialize the SSID switch."""
         super().__init__(coordinator)
-        self._section_name = section_name
+        self._ssid = ssid
+        self._sections = sections  # all UCI sections that belong to this SSID
         self._host = entry.data[CONF_HOST]
-        self._attr_unique_id = f"{DOMAIN}_{self._host}_ssid_{section_name}"
+        # Unique ID based on SSID name; stable across radio changes.
+        self._attr_unique_id = f"{DOMAIN}_{self._host}_ssid_{ssid}"
         self._optimistic_state: bool | None = None
-        # Store initial SSID name; updated dynamically from coordinator data.
-        self._ssid = iface_data.get("ssid", section_name)
-        self._radio = iface_data.get("device", "")
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _iface_data(self) -> dict:
+    def _sections_data(self) -> list[dict]:
         ssid_status = self.coordinator.data.get("ssid_status", {})
-        return ssid_status.get(self._section_name, {})
+        return [ssid_status[s] for s in self._sections if s in ssid_status]
 
     # ------------------------------------------------------------------
     # Entity properties
@@ -109,12 +120,7 @@ class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def name(self) -> str:
-        data = self._iface_data()
-        ssid = data.get("ssid", self._ssid)
-        radio = data.get("device", self._radio)
-        # Append the radio suffix so per-band switches are distinguishable
-        # e.g. "brkn-lan (radio0)" vs "brkn-lan (radio1)"
-        return f"{ssid} ({radio})" if radio else ssid
+        return self._ssid
 
     @property
     def icon(self) -> str:
@@ -128,15 +134,18 @@ class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         if self._optimistic_state is not None:
             return self._optimistic_state
-        return not self._iface_data().get("disabled", False)
+        sections = self._sections_data()
+        if not sections:
+            return False
+        # On = at least one band is enabled (disabled=False)
+        return any(not s.get("disabled", False) for s in sections)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        data = self._iface_data()
         return {
-            "section": self._section_name,
-            "radio": data.get("device", self._radio),
-            "ssid": data.get("ssid", self._ssid),
+            "ssid": self._ssid,
+            "sections": self._sections,
+            "radios": [s.get("device", "") for s in self._sections_data()],
         }
 
     # ------------------------------------------------------------------
@@ -153,11 +162,11 @@ class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
     # ------------------------------------------------------------------
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Enable the SSID."""
+        """Enable the SSID on all bands."""
         await self._set_disabled(False)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Disable the SSID."""
+        """Disable the SSID on all bands."""
         await self._set_disabled(True)
 
     async def _set_disabled(self, disabled: bool) -> None:
@@ -165,15 +174,16 @@ class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
         self.async_write_ha_state()
         try:
             ubus = await self.coordinator.data_manager.get_ubus_connection_async()
-            await ubus.uci_set_option(
-                "wireless", self._section_name, "disabled", "1" if disabled else "0"
-            )
+            for section in self._sections:
+                await ubus.uci_set_option(
+                    "wireless", section, "disabled", "1" if disabled else "0"
+                )
             await ubus.uci_commit_config("wireless")
             await ubus.wifi_reload()
             _LOGGER.info(
                 "SSID %s (%s) on %s: %s",
                 self._ssid,
-                self._section_name,
+                ", ".join(self._sections),
                 self._host,
                 "disabled" if disabled else "enabled",
             )
