@@ -913,6 +913,30 @@ class ExtendedUbus(Ubus):
             _LOGGER.warning("Failed to check hostapd availability: %s", exc)
             return False
 
+    async def get_wireless_ifaces(self) -> dict:
+        """Get all wifi-iface sections from UCI wireless config."""
+        result = await self.get_uci_config("wireless", "wifi-iface")
+        if not result or "values" not in result:
+            return {}
+        return result["values"]
+
+    async def wifi_reload(self) -> None:
+        """Reload wireless configuration by running /sbin/wifi reload."""
+        try:
+            await self.api_call(
+                API_RPC_CALL,
+                API_SUBSYS_FILE,
+                API_METHOD_EXEC,
+                {"command": "/sbin/wifi", "params": ["reload"]},
+            )
+        except PermissionError as exc:
+            _LOGGER.warning(
+                "Permission denied for wifi reload — grant file.exec /sbin/wifi in rpcd ACL: %s",
+                exc,
+            )
+        except Exception as exc:
+            _LOGGER.error("wifi reload failed: %s", exc)
+
     async def kick_device(self, hostapd_interface, mac_address, ban_time=60000, reason=5):
         """Kick a device from the AP interface.
 
