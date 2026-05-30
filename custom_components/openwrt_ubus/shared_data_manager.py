@@ -99,6 +99,7 @@ class SharedUbusDataManager:
             "iwinfo_stations": timedelta(seconds=sta_timeout),
             "ap_info": timedelta(seconds=ap_timeout),
             "service_status": timedelta(seconds=service_timeout),  # Use configured service timeout
+            "ssid_status": timedelta(seconds=60),  # UCI wireless interface state
             "hostapd_available": timedelta(minutes=30),  # Very long cache - hostapd availability rarely changes
             "conntrack_count": timedelta(seconds=system_timeout),  # Connection tracking count
             "system_temperatures": timedelta(seconds=system_timeout),  # System temperature sensors
@@ -286,6 +287,26 @@ class SharedUbusDataManager:
         except Exception as exc:
             _LOGGER.error("Error fetching service status: %s", exc)
             raise UpdateFailed(f"Error communicating with OpenWrt: {exc}") from exc
+
+    async def _fetch_ssid_status(self) -> dict:
+        """Fetch per-SSID enabled/disabled state from UCI wireless config."""
+        try:
+            client = await self._get_ubus_client()
+            ifaces = await client.get_wireless_ifaces()
+            ssid_data = {}
+            for section_name, section in ifaces.items():
+                if not isinstance(section, dict):
+                    continue
+                ssid_data[section_name] = {
+                    "ssid": section.get("ssid", section_name),
+                    "device": section.get("device", ""),
+                    "mode": section.get("mode", "ap"),
+                    "disabled": section.get("disabled", "0") == "1",
+                }
+            return ssid_data
+        except Exception as exc:
+            _LOGGER.error("Error fetching SSID status: %s", exc)
+            raise UpdateFailed(f"Error fetching SSID status: {exc}") from exc
 
     async def _get_interface_to_ssid_mapping(self) -> Dict[str, str]:
         """Get mapping of interface names to SSIDs."""
@@ -1018,6 +1039,9 @@ class SharedUbusDataManager:
                 elif data_type == "service_status":
                     # This method returns raw data, so we need to wrap it
                     raw_data = await self._fetch_service_status()
+                    data = {data_type: raw_data}
+                elif data_type == "ssid_status":
+                    raw_data = await self._fetch_ssid_status()
                     data = {data_type: raw_data}
                 elif data_type == "conntrack_count":
                     data = await self._fetch_conntrack_count()

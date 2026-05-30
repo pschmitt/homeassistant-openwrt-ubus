@@ -22,12 +22,15 @@ import asyncio
 from .const import (
     CONF_SELECTED_SERVICES,
     CONF_ENABLE_SERVICE_CONTROLS,
+    CONF_ENABLE_SSID_SWITCHES,
+    DEFAULT_ENABLE_SSID_SWITCHES,
     DOMAIN,
     API_SUBSYS_RC,
     API_METHOD_LIST,
     API_METHOD_INIT,
 )
 from .shared_data_manager import SharedDataUpdateCoordinator
+from .switches.ssid_switch import async_setup_entry as async_setup_ssid_switches
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,45 +44,35 @@ async def async_setup_entry(
 ) -> None:
     """Set up switch entities from a config entry."""
 
-    # Check if service controls are enabled
-    if not entry.data.get(CONF_ENABLE_SERVICE_CONTROLS, False):
-        _LOGGER.debug("Service controls disabled, skipping switch setup")
-        return
+    # Service control switches (optional, requires explicit enable)
+    if entry.data.get(CONF_ENABLE_SERVICE_CONTROLS, False):
+        selected_services = entry.data.get(CONF_SELECTED_SERVICES, [])
+        if selected_services:
+            data_manager_key = f"data_manager_{entry.entry_id}"
+            data_manager = hass.data[DOMAIN][data_manager_key]
 
-    # Get selected services
-    selected_services = entry.data.get(CONF_SELECTED_SERVICES, [])
-    if not selected_services:
-        _LOGGER.debug("No services selected, skipping switch setup")
-        return
+            coordinator = SharedDataUpdateCoordinator(
+                hass,
+                data_manager,
+                ["service_status"],
+                f"{DOMAIN}_services_{entry.data[CONF_HOST]}",
+                SCAN_INTERVAL,
+            )
 
-    # Get shared data manager
-    data_manager_key = f"data_manager_{entry.entry_id}"
-    data_manager = hass.data[DOMAIN][data_manager_key]
+            try:
+                await coordinator.async_config_entry_first_refresh()
+            except Exception as exc:
+                _LOGGER.warning("Initial service data fetch failed, will retry automatically: %s", exc)
 
-    # Create coordinator using shared data manager for service status
-    coordinator = SharedDataUpdateCoordinator(
-        hass,
-        data_manager,
-        ["service_status"],  # Data types this coordinator needs
-        f"{DOMAIN}_services_{entry.data[CONF_HOST]}",
-        SCAN_INTERVAL,
-    )
+            entities = [
+                OpenwrtServiceSwitch(coordinator, service_name, entry)
+                for service_name in selected_services
+            ]
+            async_add_entities(entities, True)
+            _LOGGER.info("Created %d service switch entities", len(entities))
 
-    # Fetch initial data
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as exc:
-        _LOGGER.warning("Initial service data fetch failed, will retry automatically: %s", exc)
-
-    # Create switch entities for each selected service
-    entities = []
-    for service_name in selected_services:
-        entities.append(OpenwrtServiceSwitch(coordinator, service_name, entry))
-        _LOGGER.debug("Created switch entity for service: %s", service_name)
-
-    if entities:
-        async_add_entities(entities, True)
-        _LOGGER.info("Created %d service switch entities", len(entities))
+    # SSID enable/disable switches (independent of service controls)
+    await async_setup_ssid_switches(hass, entry, async_add_entities)
 
 
 class OpenwrtServiceSwitch(CoordinatorEntity, SwitchEntity):

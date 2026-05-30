@@ -128,6 +128,8 @@ API_METHOD_INIT = "init"
 API_METHOD_SET = "set"
 API_METHOD_COMMIT = "commit"
 API_METHOD_EXEC = "exec"
+CONF_ENABLE_SSID_SWITCHES = "enable_ssid_switches"
+DEFAULT_ENABLE_SSID_SWITCHES = False
 
 
 def _build_host_port(target: str, use_https: bool, port: int | None) -> str:
