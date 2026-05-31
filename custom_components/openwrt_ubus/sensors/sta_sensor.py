@@ -30,10 +30,6 @@ from ..const import (
     DEFAULT_STA_SENSOR_TIMEOUT,
     CONF_TRACKING_METHOD,
     DEFAULT_TRACKING_METHOD,
-    CONF_SELECT_ALL_STA,
-    CONF_SELECTED_STA,
-    DEFAULT_SELECT_ALL_STA,
-    DEFAULT_SELECTED_STA,
 )
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
@@ -433,16 +429,6 @@ async def async_setup_entry(
     # Get tracking method from configuration
     tracking_method = entry.data.get(CONF_TRACKING_METHOD, DEFAULT_TRACKING_METHOD)
 
-    # Get STA sensor filter configuration
-    select_all_sta = entry.options.get(
-        CONF_SELECT_ALL_STA,
-        entry.data.get(CONF_SELECT_ALL_STA, DEFAULT_SELECT_ALL_STA),
-    )
-    selected_sta = entry.options.get(
-        CONF_SELECTED_STA,
-        entry.data.get(CONF_SELECTED_STA, DEFAULT_SELECTED_STA),
-    )
-
     # Migrate sensor unique_ids if needed
     await _migrate_sta_sensor_unique_ids(hass, entry, tracking_method)
 
@@ -479,10 +465,6 @@ async def async_setup_entry(
 
         device_stats = coordinator.data["device_statistics"]
         current_devices = set(device_stats.keys())
-
-        # Filter enabled devices
-        if not select_all_sta:
-            current_devices = {mac for mac in current_devices if mac in selected_sta}
 
         # Handle new devices
         new_devices = current_devices - coordinator.known_devices
@@ -557,10 +539,6 @@ async def async_setup_entry(
     if coordinator.data and coordinator.data.get("device_statistics"):
         device_stats = coordinator.data["device_statistics"]
         for mac_address in device_stats:
-            # Filter enabled devices
-            if not select_all_sta and mac_address not in selected_sta:
-                continue
-
             coordinator.known_devices.add(mac_address)
             device_data = device_stats[mac_address]
 
@@ -696,9 +674,6 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
 
         device_info_dict = {
             "identifiers": {(DOMAIN, self._mac_address)},
-            "name": self._get_device_name(),
-            "manufacturer": "Unknown",
-            "model": "WiFi Device",
             "connections": {("mac", self._mac_address)},
         }
 
