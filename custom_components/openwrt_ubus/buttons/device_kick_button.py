@@ -308,7 +308,7 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
 
     _attr_device_class = ButtonDeviceClass.RESTART
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
 
     def __init__(
         self,
@@ -371,36 +371,20 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
 
     @property
     def suggested_object_id(self) -> str:
-        """Return suggested entity_id for the button.
+        """Return suggested entity_id for the button."""
+        device_info = self._get_device_info()
+        device_name = device_info.get("hostname", self._initial_device_name)
 
-        Automatically adapts based on has_entity_name setting:
-        - If has_entity_name=True: Returns only suffix (HA adds device name automatically)
-        - If has_entity_name=False: Returns full name including device name
-        """
-        if self._tracking_method == "uniqueid":
-            # Get AP hostname (without domain)
-            ap_host = self._host.split(".")[0].replace("-", "_").replace(" ", "_").lower()
-
-            # Check if has_entity_name is enabled
-            if getattr(self, "_attr_has_entity_name", False):
-                # Home Assistant will add device name automatically, so we only provide the suffix
-                return f"kick"
-            else:
-                # We need to include the device name ourselves
-                device_info = self._get_device_info()
-                device_name = device_info.get("hostname", self._initial_device_name)
-
-                # Clean device name for entity_id (remove special chars, use lowercase)
-                if not device_name or device_name == "Unknown" or device_name == "*" or device_name == self._device_mac:
-                    clean_name = self._device_mac.replace(":", "_").lower()
-                else:
-                    # Remove domain suffix if present and clean
-                    clean_name = device_name.split(".")[0].replace("-", "_").replace(" ", "_").lower()
-
-                return f"{clean_name}_kick"
+        if not device_name or device_name == "Unknown" or device_name == "*" or device_name == self._device_mac:
+            clean_name = self._device_mac.replace(":", "_").lower()
         else:
-            # For combined: use default behavior
-            return None
+            clean_name = device_name.split(".")[0].replace("-", "_").replace(" ", "_").lower()
+
+        if self._tracking_method == "uniqueid":
+            return f"hostapd_kick_{clean_name}"
+        else:
+            host_slug = self._host.split(".")[0].replace("-", "_").replace(" ", "_").lower()
+            return f"hostapd_kick_{host_slug}_{clean_name}"
 
     @property
     def name(self) -> str:
