@@ -107,6 +107,9 @@ class SharedUbusDataManager:
             "network_devices": timedelta(seconds=system_timeout),  # Network device status
             "wired_devices": timedelta(seconds=sta_timeout),  # Wired device tracking
             "nlbwmon_top_hosts": timedelta(seconds=60),  # Per-host bandwidth usage via nlbwmon
+            "led_status": timedelta(seconds=300),
+            "vnstat_monthly": timedelta(seconds=300),
+            "speedtest_result": timedelta(seconds=3600),
         }
         self._update_locks: Dict[str, asyncio.Lock] = {key: asyncio.Lock() for key in self._update_intervals}
 
@@ -914,6 +917,24 @@ class SharedUbusDataManager:
                 }
             }
 
+    async def _fetch_led_status(self) -> Dict[str, Any]:
+        """Fetch current LED brightness."""
+        client = await self._get_ubus_client()
+        led_status = await client.get_led_brightness()
+        return {"led_status": led_status}
+
+    async def _fetch_vnstat_monthly(self) -> Dict[str, Any]:
+        """Fetch compact monthly vnstat data."""
+        client = await self._get_ubus_client()
+        vnstat_monthly = await client.get_vnstat_monthly()
+        return {"vnstat_monthly": vnstat_monthly}
+
+    async def _fetch_speedtest_result(self) -> Dict[str, Any]:
+        """Fetch cached speedtest result."""
+        client = await self._get_ubus_client()
+        speedtest_result = await client.get_speedtest_result()
+        return {"speedtest_result": speedtest_result}
+
 
 
     def _matches_interface(self, neighbor: dict, interface_filter: list) -> bool:
@@ -1055,6 +1076,12 @@ class SharedUbusDataManager:
                     data = await self._fetch_wired_devices()
                 elif data_type == "nlbwmon_top_hosts":
                     data = await self._fetch_nlbwmon_top_hosts()
+                elif data_type == "led_status":
+                    data = await self._fetch_led_status()
+                elif data_type == "vnstat_monthly":
+                    data = await self._fetch_vnstat_monthly()
+                elif data_type == "speedtest_result":
+                    data = await self._fetch_speedtest_result()
                 else:
                     # Defensive: This should not happen due to the check above, but log just in case
                     _LOGGER.error(

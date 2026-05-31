@@ -32,6 +32,7 @@ from .sensors import (
     eth_sensor,
     mwan3_sensor,
     nlbwmon_sensor,
+    extras_sensor,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,6 +81,12 @@ SENSOR_MODULES = [
         "default": DEFAULT_ENABLE_NLBWMON_SENSORS,
         "name": "nlbwmon_sensor",
     },
+    {
+        "module": extras_sensor,
+        "config_key": None,
+        "default": True,
+        "name": "extras_sensor",
+    },
 ]
 
 
@@ -102,7 +109,10 @@ async def async_setup_entry(
 
         # Check if this sensor type is enabled
         # Priority: options > data > default
-        enabled = entry.options.get(config_key, entry.data.get(config_key, default_enabled))
+        if config_key is None:
+            enabled = default_enabled
+        else:
+            enabled = entry.options.get(config_key, entry.data.get(config_key, default_enabled))
 
         if not enabled:
             _LOGGER.info("Sensor module %s is disabled in configuration", module_name)
