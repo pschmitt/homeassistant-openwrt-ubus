@@ -30,6 +30,7 @@ from ..const import (
     DEFAULT_STA_SENSOR_TIMEOUT,
     CONF_TRACKING_METHOD,
     DEFAULT_TRACKING_METHOD,
+    normalize_ap_device_name,
 )
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
@@ -670,7 +671,7 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         """Return device info to link this sensor to a device."""
         ap_device = "Unknown AP"
         if device_data := self._device_data():
-            ap_device = device_data.get("ap_device", "Unknown AP")
+            ap_device = normalize_ap_device_name(device_data.get("ap_device")) or "Unknown AP"
 
         device_info_dict = {
             "identifiers": {(DOMAIN, self._mac_address)},

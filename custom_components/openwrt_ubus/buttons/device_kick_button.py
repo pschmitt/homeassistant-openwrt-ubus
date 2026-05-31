@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers import entity_registry as er
 from homeassistant.exceptions import HomeAssistantError
 
-from ..const import DOMAIN, CONF_TRACKING_METHOD, DEFAULT_TRACKING_METHOD
+from ..const import DOMAIN, CONF_TRACKING_METHOD, DEFAULT_TRACKING_METHOD, normalize_ap_device_name
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -420,7 +420,7 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
         from homeassistant.helpers.device_registry import DeviceInfo
 
         device_info = self._get_device_info()
-        ap_device = device_info.get("ap_device", "unknown")
+        ap_device = normalize_ap_device_name(device_info.get("ap_device")) or "unknown"
 
         # Associate button with the mobile device (using MAC as identifier)
         device_info_dict = {
