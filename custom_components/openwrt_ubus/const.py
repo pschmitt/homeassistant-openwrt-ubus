@@ -3,7 +3,7 @@
 from homeassistant.const import Platform
 
 DOMAIN = "openwrt_ubus"
-PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON, Platform.NUMBER]
+PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON, Platform.LIGHT]
 
 # Configuration constants
 CONF_USE_HTTPS = "use_https"

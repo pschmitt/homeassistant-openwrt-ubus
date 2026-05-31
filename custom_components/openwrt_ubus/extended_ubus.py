@@ -152,32 +152,98 @@ class ExtendedUbus(Ubus):
 
         return str(stdout)
 
-    async def get_led_brightness(self):
-        """Return current LED brightness as a percentage."""
+    @staticmethod
+    def _get_file_data(result):
+        """Extract file contents from a file.read response."""
+        if not isinstance(result, dict):
+            return ""
+
+        data = result.get("data", "")
+        if data is None:
+            return ""
+
+        return str(data)
+
+    @staticmethod
+    def _parse_led_triggers(trigger_text):
+        """Parse the Linux LED trigger line into current and available triggers."""
+        current_trigger = "none"
+        triggers = []
+
+        for token in trigger_text.split():
+            if token.startswith("[") and token.endswith("]"):
+                token = token[1:-1]
+                current_trigger = token
+            if token not in triggers:
+                triggers.append(token)
+
+        if "none" not in triggers:
+            triggers.insert(0, "none")
+
+        return current_trigger, triggers
+
+    async def list_leds(self):
+        """Return the discovered LED inventory with capabilities and state."""
         try:
-            result = await self.file_exec("/bin/sh", ["-c", "/usr/local/bin/leds status"])
-            if result.get("code") != 0:
-                return None
+            uci_result = await self.uci_get_option("system")
+            values = uci_result.get("values", {}) if isinstance(uci_result, dict) else {}
+            led_sections = {
+                section_values.get("sysfs"): {
+                    "section": section_name,
+                    "configured_trigger": section_values.get("trigger", "none"),
+                    "configured_default": section_values.get("default", "0"),
+                }
+                for section_name, section_values in values.items()
+                if isinstance(section_values, dict)
+                and section_values.get(".type") == "led"
+                and section_values.get("sysfs")
+            }
 
-            stdout = self._get_stdout(result).strip()
-            if not stdout:
-                return None
+            if not led_sections:
+                return {}
 
-            raw_value = max(0, min(255, int(stdout)))
-            return round(raw_value * 100 / 255)
+            leds = {}
+            for name, led_config in led_sections.items():
+                trigger_result = await self.file_read(f"/sys/class/leds/{name}/trigger")
+                brightness_result = await self.file_read(f"/sys/class/leds/{name}/brightness")
+                max_brightness_result = await self.file_read(f"/sys/class/leds/{name}/max_brightness")
+
+                trigger_text = self._get_file_data(trigger_result).strip()
+                brightness_text = self._get_file_data(brightness_result).strip()
+                max_brightness_text = self._get_file_data(max_brightness_result).strip()
+
+                if not trigger_text or not max_brightness_text:
+                    continue
+
+                current_trigger, triggers = self._parse_led_triggers(trigger_text)
+                brightness_value = max(0, int(brightness_text or 0))
+                max_brightness_value = max(1, int(max_brightness_text or 1))
+                configured_default = str(led_config.get("configured_default", "0"))
+
+                leds[name] = {
+                    "name": name,
+                    "section": led_config["section"],
+                    "brightness": brightness_value,
+                    "max_brightness": max_brightness_value,
+                    "current_trigger": current_trigger,
+                    "triggers": triggers,
+                    "supports_effects": len(triggers) > 1,
+                    "configured_trigger": led_config.get("configured_trigger", "none"),
+                    "configured_default": configured_default,
+                    "is_on": current_trigger != "none" or brightness_value > 0 or configured_default not in {"0", "false", "False"},
+                }
+
+            return leds
         except Exception as exc:
-            _LOGGER.debug("Error reading LED brightness: %s", exc)
-            return None
+            _LOGGER.debug("Error listing LEDs: %s", exc)
+            return {}
 
-    async def set_led_brightness(self, brightness_percent):
-        """Set LED brightness from a percentage value."""
-        brightness_percent = max(0, min(100, int(round(brightness_percent))))
-
-        if brightness_percent == 0:
-            return await self.file_exec("/bin/sh", ["-c", "/usr/local/bin/leds off"])
-
-        raw_value = max(0, min(255, round(brightness_percent * 255 / 100)))
-        return await self.file_exec("/bin/sh", ["-c", f"/usr/local/bin/leds on {raw_value}"])
+    async def configure_led(self, section: str, trigger: str, enabled: bool):
+        """Persist LED settings through UCI and reload the LED service."""
+        await self.uci_set_option("system", section, "trigger", trigger)
+        await self.uci_set_option("system", section, "default", "1" if enabled else "0")
+        await self.uci_commit_config("system")
+        await self.service_action("led", "reload")
 
     async def get_vnstat_monthly(self):
         """Return compact vnstat monthly JSON for all interfaces."""

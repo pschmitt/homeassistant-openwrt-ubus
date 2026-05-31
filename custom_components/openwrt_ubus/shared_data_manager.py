@@ -107,7 +107,7 @@ class SharedUbusDataManager:
             "network_devices": timedelta(seconds=system_timeout),  # Network device status
             "wired_devices": timedelta(seconds=sta_timeout),  # Wired device tracking
             "nlbwmon_top_hosts": timedelta(seconds=60),  # Per-host bandwidth usage via nlbwmon
-            "led_status": timedelta(seconds=300),
+            "leds": timedelta(seconds=300),
             "vnstat_monthly": timedelta(seconds=300),
             "speedtest_result": timedelta(seconds=3600),
         }
@@ -917,11 +917,11 @@ class SharedUbusDataManager:
                 }
             }
 
-    async def _fetch_led_status(self) -> Dict[str, Any]:
-        """Fetch current LED brightness."""
+    async def _fetch_leds(self) -> Dict[str, Any]:
+        """Fetch LED inventory and current state."""
         client = await self._get_ubus_client()
-        led_status = await client.get_led_brightness()
-        return {"led_status": led_status}
+        leds = await client.list_leds()
+        return {"leds": leds}
 
     async def _fetch_vnstat_monthly(self) -> Dict[str, Any]:
         """Fetch compact monthly vnstat data."""
@@ -1076,8 +1076,8 @@ class SharedUbusDataManager:
                     data = await self._fetch_wired_devices()
                 elif data_type == "nlbwmon_top_hosts":
                     data = await self._fetch_nlbwmon_top_hosts()
-                elif data_type == "led_status":
-                    data = await self._fetch_led_status()
+                elif data_type == "leds":
+                    data = await self._fetch_leds()
                 elif data_type == "vnstat_monthly":
                     data = await self._fetch_vnstat_monthly()
                 elif data_type == "speedtest_result":
