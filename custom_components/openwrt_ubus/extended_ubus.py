@@ -1,6 +1,8 @@
 """Extended Ubus client with specific OpenWrt functionality."""
 
+import json
 import logging
+import time
 
 from .Ubus import Ubus
 from .Ubus.interface import PreparedCall
@@ -137,6 +139,122 @@ class ExtendedUbus(Ubus):
                 "params": params or [],
             },
         )
+
+    @staticmethod
+    def _get_stdout(result):
+        """Extract stdout text from a file.exec response."""
+        if not isinstance(result, dict):
+            return ""
+
+        stdout = result.get("stdout", "")
+        if stdout is None:
+            return ""
+
+        return str(stdout)
+
+    async def get_led_brightness(self):
+        """Return current LED brightness as a percentage."""
+        try:
+            result = await self.file_exec("/bin/sh", ["-c", "/usr/local/bin/leds status"])
+            if result.get("code") != 0:
+                return None
+
+            stdout = self._get_stdout(result).strip()
+            if not stdout:
+                return None
+
+            raw_value = max(0, min(255, int(stdout)))
+            return round(raw_value * 100 / 255)
+        except Exception as exc:
+            _LOGGER.debug("Error reading LED brightness: %s", exc)
+            return None
+
+    async def set_led_brightness(self, brightness_percent):
+        """Set LED brightness from a percentage value."""
+        brightness_percent = max(0, min(100, int(round(brightness_percent))))
+
+        if brightness_percent == 0:
+            return await self.file_exec("/bin/sh", ["-c", "/usr/local/bin/leds off"])
+
+        raw_value = max(0, min(255, round(brightness_percent * 255 / 100)))
+        return await self.file_exec("/bin/sh", ["-c", f"/usr/local/bin/leds on {raw_value}"])
+
+    async def get_vnstat_monthly(self):
+        """Return compact vnstat monthly JSON for all interfaces."""
+        try:
+            result = await self.file_exec("/usr/bin/vnstat", ["--json", "m", "1"])
+            if result.get("code") != 0:
+                return {}
+
+            stdout = self._get_stdout(result).strip()
+            if not stdout:
+                return {}
+
+            payload = json.loads(stdout)
+            now = time.time()
+            interfaces = {}
+
+            for interface in payload.get("interfaces", []):
+                name = interface.get("name")
+                months = interface.get("traffic", {}).get("month", [])
+                if not name or not months:
+                    continue
+
+                non_future_months = [month for month in months if month.get("timestamp", 0) <= now]
+                latest_month = non_future_months[-1] if non_future_months else months[-1]
+
+                rx = int(latest_month.get("rx", 0))
+                tx = int(latest_month.get("tx", 0))
+                total = rx + tx
+
+                interfaces[name] = {
+                    "interface": name,
+                    "rx": rx,
+                    "tx": tx,
+                    "total": total,
+                    "rx_gb": round(rx / 1024 / 1024 / 1024, 2),
+                    "tx_gb": round(tx / 1024 / 1024 / 1024, 2),
+                    "total_gb": round(total / 1024 / 1024 / 1024, 2),
+                    "timestamp": latest_month.get("timestamp"),
+                    "date": latest_month.get("date"),
+                }
+
+            return interfaces
+        except Exception as exc:
+            _LOGGER.debug("Error reading vnstat monthly data: %s", exc)
+            return {}
+
+    async def get_speedtest_result(self):
+        """Return cached speedtest JSON if available."""
+        try:
+            result = await self.file_exec(
+                "/bin/sh",
+                ["-c", "[ -s /tmp/speedtest.json ] && cat /tmp/speedtest.json || true"],
+            )
+            if result.get("code") != 0:
+                return None
+
+            stdout = self._get_stdout(result).strip()
+            if not stdout:
+                return None
+
+            payload = json.loads(stdout)
+            download_mbps = float(payload.get("download", {}).get("bandwidth", 0)) * 8 / 1000000
+            upload_mbps = float(payload.get("upload", {}).get("bandwidth", 0)) * 8 / 1000000
+
+            return {
+                "download_mbps": round(download_mbps, 2),
+                "upload_mbps": round(upload_mbps, 2),
+                "ping": payload.get("ping", {}).get("latency"),
+                "jitter": payload.get("ping", {}).get("jitter"),
+                "packet_loss": payload.get("packetLoss"),
+                "timestamp": payload.get("timestamp"),
+                "isp": payload.get("isp"),
+                "interface": payload.get("interface", {}).get("name"),
+            }
+        except Exception as exc:
+            _LOGGER.debug("Error reading speedtest result: %s", exc)
+            return None
 
     # --- ETH SENSOR DEBUG/ERROR LOGGING PATCH ---
 

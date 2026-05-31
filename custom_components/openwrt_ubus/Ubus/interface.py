@@ -89,11 +89,14 @@ class Ubus:
 
     async def logout(self):
         """Clear the current session ID."""
-        await self._api_call(
-            API_RPC_CALL,
-            API_SUBSYS_SESSION,
-            API_SESSION_METHOD_DESTROY,
-        )
+        try:
+            await self._api_call(
+                API_RPC_CALL,
+                API_SUBSYS_SESSION,
+                API_SESSION_METHOD_DESTROY,
+            )
+        except Exception as exc:
+            _LOGGER.debug("Ignoring session cleanup error during logout: %s", exc)
         self.session_id = None
         self.session_expire = 0
 
@@ -213,7 +216,10 @@ class Ubus:
 
                     # Special handling for permission errors
                     if error_code == -32002 or "Access denied" in error_message:
-                        _LOGGER.warning(
+                        log_fn = _LOGGER.debug if (
+                            subsystem == API_SUBSYS_SESSION and method == API_SESSION_METHOD_DESTROY
+                        ) else _LOGGER.warning
+                        log_fn(
                             "Permission denied when calling %s.%s: %s (code: %d) [session_id: %s]",
                             subsystem,
                             method,
