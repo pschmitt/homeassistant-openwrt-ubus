@@ -33,6 +33,7 @@ from .const import (
     CONF_ENABLE_ETH_SENSORS,
     CONF_ENABLE_MWAN3_SENSORS,
     CONF_ENABLE_NLBWMON_SENSORS,
+    CONF_ENABLE_SSID_SWITCHES,
     CONF_ENABLE_SERVICE_CONTROLS,
     CONF_SELECTED_SERVICES,
     DEFAULT_DHCP_SOFTWARE,
@@ -102,6 +103,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry = hass.config_entries.async_get_entry(entry.entry_id)
         if entry is None:
             raise ConfigEntryNotReady("Failed to reload config entry data for nlbwmon migration")
+
+    # Backward compatibility: SSID switches shipped before the toggle existed,
+    # so legacy entries should keep them enabled unless the user explicitly
+    # turned them off later.
+    if CONF_ENABLE_SSID_SWITCHES not in entry.data:
+        new_data = dict(entry.data)
+        new_data[CONF_ENABLE_SSID_SWITCHES] = True
+        hass.config_entries.async_update_entry(entry, data=new_data)
+        entry = hass.config_entries.async_get_entry(entry.entry_id)
+        if entry is None:
+            raise ConfigEntryNotReady("Failed to reload config entry data for SSID switch migration")
 
     # Test connection before setting up platforms
     hostname = entry.data[CONF_HOST]
