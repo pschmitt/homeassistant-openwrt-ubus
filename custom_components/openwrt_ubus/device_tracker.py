@@ -40,6 +40,7 @@ from .const import (
     DHCP_SOFTWARES,
     DOMAIN,
     WIRELESS_SOFTWARES,
+    normalize_ap_device_name,
 )
 from .shared_data_manager import SharedDataUpdateCoordinator
 
@@ -525,14 +526,14 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         if self._tracking_method == "uniqueid":
             device_data, _ = self._get_device_data_from_any_coordinator()
             if device_data:
-                return device_data.get("ap_device", "Unknown AP")
+                return normalize_ap_device_name(device_data.get("ap_device")) or "Unknown AP"
             return "Unknown AP"
 
         # For combined tracking, only check local coordinator
         device_stats = self.coordinator.data.get("device_statistics", {})
         device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
         if device_data:
-            return device_data.get("ap_device", "Unknown AP")
+            return normalize_ap_device_name(device_data.get("ap_device")) or "Unknown AP"
         return "Unknown AP"
 
     @property

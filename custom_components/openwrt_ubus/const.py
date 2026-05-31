@@ -132,6 +132,15 @@ CONF_ENABLE_SSID_SWITCHES = "enable_ssid_switches"
 DEFAULT_ENABLE_SSID_SWITCHES = False
 
 
+def normalize_ap_device_name(ap_device: str | None) -> str | None:
+    """Normalize AP device names to the identifier form used by AP devices."""
+    if ap_device is None:
+        return None
+    if ap_device.startswith("hostapd."):
+        return ap_device[len("hostapd."):]
+    return ap_device
+
+
 def _build_host_port(target: str, use_https: bool, port: int | None) -> str:
     """Build host:port string, omitting port if it's the default."""
     if port is None:
