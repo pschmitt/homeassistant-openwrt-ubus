@@ -248,7 +248,7 @@ class ExtendedUbus(Ubus):
     async def get_vnstat_monthly(self):
         """Return compact vnstat monthly JSON for all interfaces."""
         try:
-            result = await self.file_exec("/usr/bin/vnstat", ["--json", "m", "1"])
+            result = await self.file_exec("/usr/bin/vnstat", ["--json", "m", "2"])
             if result.get("code") != 0:
                 return {}
 
