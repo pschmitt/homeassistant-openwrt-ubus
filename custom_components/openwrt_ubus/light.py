@@ -137,6 +137,7 @@ class OpenwrtLedLight(CoordinatorEntity, LightEntity):
     """Representation of a single OpenWrt LED."""
 
     _attr_has_entity_name = True
+    _attr_entity_registry_visible_default = False
 
     def __init__(self, coordinator: SharedDataUpdateCoordinator, entry: ConfigEntry, led_name: str) -> None:
         """Initialize the light."""
