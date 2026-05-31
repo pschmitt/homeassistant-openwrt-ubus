@@ -10,12 +10,14 @@ from typing import Any
 
 from homeassistant.components.light import ATTR_EFFECT, ColorMode, LightEntity, LightEntityFeature
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_HOST, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .const import DOMAIN
 from .shared_data_manager import SharedDataUpdateCoordinator
@@ -70,6 +72,18 @@ def _friendly_trigger_name(trigger: str) -> str:
     return trigger
 
 
+def _friendly_router_name(host: str) -> str:
+    """Convert a router host into a cleaner display name."""
+    if host == "turris":
+        return "Turris Omnia"
+    return host.replace("-", " ").title()
+
+
+def _led_entity_id(host: str, led_name: str) -> str:
+    """Return the expected entity_id for a single LED light."""
+    return f"light.openwrt_router_{slugify(host)}_{slugify(_friendly_led_name(led_name))}"
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -87,18 +101,23 @@ async def async_setup_entry(
         SCAN_INTERVAL,
     )
     coordinator.known_leds = set()
+    coordinator.group_added = False
 
     async def _add_new_led_entities() -> None:
         led_data = coordinator.data.get("leds", {})
         if not isinstance(led_data, dict):
             return
 
+        new_entities = []
+        if not coordinator.group_added and led_data:
+            new_entities.append(OpenwrtLedLightGroup(coordinator, entry, sorted(led_data)))
+            coordinator.group_added = True
+
         new_leds = set(led_data) - coordinator.known_leds
-        if not new_leds:
+        if not new_leds and not new_entities:
             return
 
         entity_registry = er.async_get(hass)
-        new_entities = []
 
         for led_name in sorted(new_leds):
             unique_id = f"{entry.data[CONF_HOST]}_led_{led_name}"
@@ -120,6 +139,8 @@ async def async_setup_entry(
     entities = []
     led_data = coordinator.data.get("leds", {})
     if isinstance(led_data, dict):
+        entities.append(OpenwrtLedLightGroup(coordinator, entry, sorted(led_data)))
+        coordinator.group_added = True
         for led_name in sorted(led_data):
             entities.append(OpenwrtLedLight(coordinator, entry, led_name))
             coordinator.known_leds.add(led_name)
@@ -308,3 +329,138 @@ class OpenwrtLedLight(CoordinatorEntity, LightEntity):
         self._optimistic_trigger = "none"
         self.async_write_ha_state()
         await self._refresh_after_change()
+
+
+class OpenwrtLedLightGroup(CoordinatorEntity, LightEntity):
+    """Representation of all LEDs on a router as one grouped light."""
+
+    _attr_has_entity_name = False
+
+    def __init__(
+        self,
+        coordinator: SharedDataUpdateCoordinator,
+        entry: ConfigEntry,
+        led_names: list[str],
+    ) -> None:
+        """Initialize the grouped LED light."""
+        super().__init__(coordinator)
+        self._host = entry.data[CONF_HOST]
+        self._member_led_names = led_names
+        self._member_entity_ids = [_led_entity_id(self._host, led_name) for led_name in led_names]
+        self._attr_icon = "mdi:router-wireless"
+        self._attr_name = f"{_friendly_router_name(self._host)} LEDs"
+        self._attr_unique_id = f"{self._host}_led_group"
+        self.entity_id = f"light.{slugify(_friendly_router_name(self._host))}_leds"
+
+    @property
+    def available(self) -> bool:
+        """Return True if at least one member LED is available."""
+        return any(
+            state is not None and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+            for state in self._member_states
+        )
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Attach the grouped light to the router device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._host)},
+            name=f"OpenWrt Router ({self._host})",
+            manufacturer="OpenWrt",
+            model="Router",
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if any member LED is on."""
+        return any(state is not None and state.state == STATE_ON for state in self._member_states)
+
+    @property
+    def supported_color_modes(self) -> set[ColorMode]:
+        """Return supported color modes."""
+        return {ColorMode.ONOFF}
+
+    @property
+    def color_mode(self) -> ColorMode | None:
+        """Return the current color mode."""
+        return ColorMode.ONOFF if self.is_on else None
+
+    @property
+    def supported_features(self) -> LightEntityFeature:
+        """Return supported features."""
+        return (
+            LightEntityFeature.EFFECT
+            if self.effect_list
+            else LightEntityFeature(0)
+        )
+
+    @property
+    def effect_list(self) -> list[str] | None:
+        """Return the union of all child LED effects."""
+        led_data = self.coordinator.data.get("leds", {})
+        if not isinstance(led_data, dict):
+            return None
+
+        effects = {
+            _friendly_trigger_name(trigger)
+            for led_name in self._member_led_names
+            for trigger in led_data.get(led_name, {}).get("triggers", [])
+        }
+        return sorted(effects) or None
+
+    @property
+    def effect(self) -> str | None:
+        """Return the shared effect if all active members agree."""
+        active_effects = {
+            state.attributes.get("effect")
+            for state in self._member_states
+            if state is not None and state.state == STATE_ON
+        }
+        active_effects.discard(None)
+        if len(active_effects) == 1:
+            return next(iter(active_effects))
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose grouped member entities."""
+        return {"entity_id": self._member_entity_ids}
+
+    @property
+    def _member_states(self) -> list[Any]:
+        """Return the current Home Assistant states of member LEDs."""
+        if self.hass is None:
+            return []
+        return [self.hass.states.get(entity_id) for entity_id in self._member_entity_ids]
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to member state updates."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass,
+                self._member_entity_ids,
+                self._handle_member_state_change,
+            )
+        )
+
+    @callback
+    def _handle_member_state_change(self, _event: Any) -> None:
+        """Refresh group state when a member changes."""
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on all member LEDs."""
+        service_data: dict[str, Any] = {"entity_id": self._member_entity_ids}
+        if ATTR_EFFECT in kwargs:
+            service_data[ATTR_EFFECT] = kwargs[ATTR_EFFECT]
+        await self.hass.services.async_call("light", "turn_on", service_data, blocking=True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off all member LEDs."""
+        await self.hass.services.async_call(
+            "light",
+            "turn_off",
+            {"entity_id": self._member_entity_ids},
+            blocking=True,
+        )
