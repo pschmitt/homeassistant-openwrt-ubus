@@ -106,7 +106,7 @@ service uhttpd start && service uhttpd enable
 
 1. **📂 Download**: Clone or download this repository
    ```bash
-   git clone https://github.com/FUjr/homeassistant-openwrt-ubus.git
+   git clone https://github.com/pschmitt/homeassistant-openwrt-ubus.git
    ```
 
 2. **📋 Copy Files**: Copy the integration to your Home Assistant
@@ -122,17 +122,15 @@ service uhttpd start && service uhttpd enable
 
 #### Method 2: HACS Installation (Recommended) 🌟
 
-> **Note**: This integration is available as a custom HACS repository
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=pschmitt&repository=homeassistant-openwrt-ubus&category=integration)
 
-1. **➕ Add Repository**: In HACS, go to **Integrations** → **⋮** → **Custom repositories**
-   
-2. **📦 Install**: Add `https://github.com/FUjr/homeassistant-openwrt-ubus` as Integration
+1. **➕ Add Repository**: Click the badge above, or in HACS go to **Integrations** → **⋮** → **Custom repositories** and add `https://github.com/pschmitt/homeassistant-openwrt-ubus` as Integration.
 
-3. **⬇️ Download**: Search for "OpenWrt ubus" and install
+2. **⬇️ Download**: Search for "OpenWrt ubus" and install.
 
-4. **🔄 Restart**: Restart Home Assistant
+3. **🔄 Restart**: Restart Home Assistant.
 
-5. **⚙️ Setup**: Add the integration through **Settings** → **Devices & Services**
+4. **⚙️ Setup**: Add the integration through **Settings** → **Devices & Services**.
 
 ### Router Permissions Setup 🔐
 
