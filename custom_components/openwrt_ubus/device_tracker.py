@@ -20,7 +20,7 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
     CONF_IP_ADDRESS,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -458,6 +458,31 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         self._attr_unique_id = _generate_unique_id(self._host, mac_address, self._tracking_method)
         self._attr_name = None  # Will be set dynamically
         self._attr_entity_registry_enabled_default = True  # Enable by default
+        self._last_name: str | None = None  # Track name changes for original_name sync
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from coordinator, keeping entity registry name in sync."""
+        if self.hass is not None and self.entity_id:
+            current_name = self.name
+            mac_slug = self._attr_mac_address.replace(":", "").lower()
+            if (
+                self._last_name is not None
+                and current_name != self._last_name
+                and current_name.lower() != mac_slug
+                and self._last_name.lower() != mac_slug
+            ):
+                entity_registry = er.async_get(self.hass)
+                if (entry := entity_registry.async_get(self.entity_id)) and entry.original_name != current_name:
+                    entity_registry.async_update_entity(self.entity_id, original_name=current_name)
+                    _LOGGER.info(
+                        "Updated device tracker original_name for %s: '%s' → '%s'",
+                        self.entity_id,
+                        entry.original_name,
+                        current_name,
+                    )
+            self._last_name = current_name
+        super()._handle_coordinator_update()
 
     def _get_device_data_from_any_coordinator(self) -> tuple[dict | None, str | None]:
         """Get device data from any coordinator (for uniqueid tracking method).
