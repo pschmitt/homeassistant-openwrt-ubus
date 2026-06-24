@@ -198,13 +198,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> SharedDataUpdateCoordinator | None:
     """Set up OpenWrt QModem sensors from a config entry."""
-    # Check if modem_ctrl is available from the initial setup
-    modem_ctrl_available = hass.data.get(DOMAIN, {}).get("modem_ctrl_available", False)
-
-    if not modem_ctrl_available:
-        _LOGGER.info("QModem entities not created - modem_ctrl is not available")
-        return None
-
     # Get shared data manager
     data_manager_key = f"data_manager_{entry.entry_id}"
     data_manager = hass.data[DOMAIN][data_manager_key]
@@ -227,6 +220,9 @@ async def async_setup_entry(
 
     # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
+    if not coordinator.data or not coordinator.data.get("qmodem_info"):
+        _LOGGER.info("QModem entities not created - modem_ctrl is not available")
+        return None
 
     # Create QModem sensor entities
     entities = [QModemSensor(coordinator, description) for description in SENSOR_DESCRIPTIONS]

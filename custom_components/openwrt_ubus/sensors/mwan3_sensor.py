@@ -160,13 +160,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> SharedDataUpdateCoordinator | None:
     """Set up OpenWrt MWAN3 sensors from a config entry."""
-    # Check if mwan3 is available from the initial setup
-    mwan3_available = hass.data.get(DOMAIN, {}).get("mwan3_available", False)
-
-    if not mwan3_available:
-        _LOGGER.info("MWAN3 entities not created - mwan3 is not available")
-        return None
-
     # Get shared data manager
     data_manager_key = f"data_manager_{entry.entry_id}"
     data_manager = hass.data[DOMAIN][data_manager_key]
@@ -310,6 +303,9 @@ async def async_setup_entry(
 
     # Fetch initial data to potentially create initial entities
     await coordinator.async_config_entry_first_refresh()
+    if not coordinator.data or not coordinator.data.get("mwan3_status"):
+        _LOGGER.info("MWAN3 entities not created - mwan3 is not available")
+        return None
 
     host = coordinator.data_manager.entry.data[CONF_HOST]
     device_registry = dr.async_get(hass)

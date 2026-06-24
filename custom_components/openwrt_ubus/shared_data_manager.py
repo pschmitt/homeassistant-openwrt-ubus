@@ -60,6 +60,7 @@ class SharedUbusDataManager:
         self._data_cache: Dict[str, Dict[str, Any]] = {}
         self._last_update: Dict[str, datetime] = {}
         self._interface_to_ssid = {}  # Cache for interface->SSID mapping
+        self._logged_unavailable_features: set[str] = set()
 
         # Get timeout values from configuration (priority: options > data > default)
         system_timeout = entry.options.get(
@@ -115,6 +116,7 @@ class SharedUbusDataManager:
 
         # Initialize ubus clients
         self._ubus_clients: Dict[str, ExtendedUbus] = {}
+        self._client_locks: Dict[str, asyncio.Lock] = {}
         self._session = None
 
     async def logout(self):
@@ -124,7 +126,14 @@ class SharedUbusDataManager:
 
     async def _get_ubus_client(self, client_type: str = "default") -> ExtendedUbus:
         """Get or create ubus client instance."""
-        if client_type not in self._ubus_clients:
+        if client_type in self._ubus_clients:
+            return self._ubus_clients[client_type]
+
+        lock = self._client_locks.setdefault(client_type, asyncio.Lock())
+        async with lock:
+            if client_type in self._ubus_clients:
+                return self._ubus_clients[client_type]
+
             if self._session is None:
                 self._session = async_get_clientsession(
                     self.hass,
@@ -220,6 +229,9 @@ class SharedUbusDataManager:
         """Fetch QModem information if available."""
         client = await self._get_ubus_client("qmodem")
         try:
+            if not await client.list_modem_ctrl():
+                _LOGGER.debug("QModem data unavailable because modem_ctrl is not listed by ubus")
+                return {"qmodem_info": None}
             qmodem_info = await client.get_qmodem_info()
             _LOGGER.debug("QModem data fetched successfully")
             return {"qmodem_info": qmodem_info}
@@ -231,6 +243,9 @@ class SharedUbusDataManager:
         """Fetch MWAN3 status information if available."""
         client = await self._get_ubus_client("mwan3")
         try:
+            if not await client.list_mwan3():
+                _LOGGER.debug("MWAN3 data unavailable because mwan3 is not listed by ubus")
+                return {"mwan3_status": None}
             mwan3_status = await client.get_mwan3_status()
             _LOGGER.debug("MWAN3 data fetched successfully")
             return {"mwan3_status": mwan3_status}
@@ -900,11 +915,20 @@ class SharedUbusDataManager:
             }
 
         except Exception as exc:
-            if "Permission Denied" in str(exc) or "Access denied" in str(exc):
-                _LOGGER.warning(
-                    "nlbwmon data requires ubus file.exec permission for '/usr/sbin/nlbw'. "
-                    "Grant that command in the OpenWrt rpcd ACL to enable top-host usage data."
-                )
+            message = str(exc)
+            if "Permission Denied" in message or "Access denied" in message:
+                log_key = "nlbwmon_permission"
+                if log_key not in self._logged_unavailable_features:
+                    self._logged_unavailable_features.add(log_key)
+                    _LOGGER.warning(
+                        "nlbwmon data requires ubus file.exec permission for '/usr/sbin/nlbw'. "
+                        "Grant that command in the OpenWrt rpcd ACL to enable top-host usage data."
+                    )
+            elif "Not Found" in message:
+                log_key = "nlbwmon_missing"
+                if log_key not in self._logged_unavailable_features:
+                    self._logged_unavailable_features.add(log_key)
+                    _LOGGER.info("nlbwmon data unavailable because '/usr/sbin/nlbw' was not found")
             else:
                 _LOGGER.error("Error fetching nlbwmon top hosts: %s", exc)
 
