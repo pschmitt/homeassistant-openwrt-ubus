@@ -277,20 +277,28 @@ async def async_setup_entry(
                         existing._initial_device_name,
                         new_hostname,
                     )
+                    old_hostname = existing._initial_device_name
                     existing._initial_device_name = new_hostname
-                    # Also update the entity registry original_name so HA's "default"
-                    # friendly name reflects the rename (not just the live state attribute)
+                    # Sync entity registry: update original_name and, if the stored
+                    # user-visible name was auto-generated and still contains the old
+                    # hostname, replace that substring too so friendly_name updates.
                     if existing.hass and existing.entity_id:
                         new_name = existing.name  # live from coordinator while device connected
                         entry_reg = er.async_get(hass)
-                        if (reg_entry := entry_reg.async_get(existing.entity_id)) and reg_entry.original_name != new_name:
-                            entry_reg.async_update_entity(existing.entity_id, original_name=new_name)
-                            _LOGGER.info(
-                                "Updated original_name for %s: '%s' → '%s'",
-                                existing.entity_id,
-                                reg_entry.original_name,
-                                new_name,
-                            )
+                        if reg_entry := entry_reg.async_get(existing.entity_id):
+                            update_kwargs = {}
+                            if reg_entry.original_name != new_name:
+                                update_kwargs["original_name"] = new_name
+                            if reg_entry.name and old_hostname in reg_entry.name:
+                                update_kwargs["name"] = reg_entry.name.replace(old_hostname, new_hostname)
+                            if update_kwargs:
+                                entry_reg.async_update_entity(existing.entity_id, **update_kwargs)
+                                _LOGGER.info(
+                                    "Updated registry names for %s (hostname: %s → %s)",
+                                    existing.entity_id,
+                                    old_hostname,
+                                    new_hostname,
+                                )
 
             # Mark button as seen in this update cycle
             created_buttons.add(button_id)

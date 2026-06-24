@@ -472,15 +472,22 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
                 and current_name.lower() != mac_slug
                 and self._last_name.lower() != mac_slug
             ):
+                old_name = self._last_name
                 entity_registry = er.async_get(self.hass)
-                if (entry := entity_registry.async_get(self.entity_id)) and entry.original_name != current_name:
-                    entity_registry.async_update_entity(self.entity_id, original_name=current_name)
-                    _LOGGER.info(
-                        "Updated device tracker original_name for %s: '%s' → '%s'",
-                        self.entity_id,
-                        entry.original_name,
-                        current_name,
-                    )
+                if entry := entity_registry.async_get(self.entity_id):
+                    update_kwargs = {}
+                    if entry.original_name != current_name:
+                        update_kwargs["original_name"] = current_name
+                    if entry.name and old_name in entry.name:
+                        update_kwargs["name"] = entry.name.replace(old_name, current_name)
+                    if update_kwargs:
+                        entity_registry.async_update_entity(self.entity_id, **update_kwargs)
+                        _LOGGER.info(
+                            "Updated device tracker registry names for %s: '%s' → '%s'",
+                            self.entity_id,
+                            old_name,
+                            current_name,
+                        )
             self._last_name = current_name
         super()._handle_coordinator_update()
 
