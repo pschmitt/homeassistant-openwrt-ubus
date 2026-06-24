@@ -278,6 +278,19 @@ async def async_setup_entry(
                         new_hostname,
                     )
                     existing._initial_device_name = new_hostname
+                    # Also update the entity registry original_name so HA's "default"
+                    # friendly name reflects the rename (not just the live state attribute)
+                    if existing.hass and existing.entity_id:
+                        new_name = existing.name  # live from coordinator while device connected
+                        entry_reg = er.async_get(hass)
+                        if (reg_entry := entry_reg.async_get(existing.entity_id)) and reg_entry.original_name != new_name:
+                            entry_reg.async_update_entity(existing.entity_id, original_name=new_name)
+                            _LOGGER.info(
+                                "Updated original_name for %s: '%s' → '%s'",
+                                existing.entity_id,
+                                reg_entry.original_name,
+                                new_name,
+                            )
 
             # Mark button as seen in this update cycle
             created_buttons.add(button_id)
