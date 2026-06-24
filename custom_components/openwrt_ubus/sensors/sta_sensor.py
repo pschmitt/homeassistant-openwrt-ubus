@@ -472,30 +472,11 @@ async def async_setup_entry(
         if new_devices:
             _LOGGER.info("Found %d new STA devices: %s", len(new_devices), new_devices)
 
-            # Get entity registry to check for existing entities
-            entity_registry = er.async_get(hass)
-
             new_entities = []
             for mac_address in new_devices:
                 # Check each sensor type for this device
                 device_sensors_to_add = []
                 for description in SENSOR_DESCRIPTIONS:
-                    # Build unique_id matching the format used by DeviceStatisticsSensor
-                    if tracking_method == "uniqueid":
-                        unique_id = f"sensor_{mac_address}_{description.key}"
-                    else:
-                        unique_id = f"{entry.data[CONF_HOST]}_sensor_{mac_address}_{description.key}"
-
-                    existing_entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-
-                    if existing_entity_id:
-                        _LOGGER.debug(
-                            "STA sensor entity %s already exists with entity_id %s, skipping creation",
-                            unique_id,
-                            existing_entity_id,
-                        )
-                        continue
-
                     # Check if sensor has required data
                     device_data = device_stats.get(mac_address, {})
                     mapping = SENSOR_VALUE_MAPPING.get(description.key)
@@ -515,7 +496,7 @@ async def async_setup_entry(
 
             # Add new entities only if there are any
             if new_entities:
-                async_add_entities(new_entities, True)
+                async_add_entities(new_entities, False)
                 _LOGGER.info(
                     "Created %d STA sensor entities for %d new devices",
                     len(new_entities),
@@ -532,28 +513,6 @@ async def async_setup_entry(
             for mac_address in removed_devices:
                 coordinator.known_devices.discard(mac_address)
 
-    # Perform first refresh
-    await coordinator.async_config_entry_first_refresh()
-
-    # Add initial sensors for any devices already discovered
-    initial_entities = []
-    if coordinator.data and coordinator.data.get("device_statistics"):
-        device_stats = coordinator.data["device_statistics"]
-        for mac_address in device_stats:
-            coordinator.known_devices.add(mac_address)
-            device_data = device_stats[mac_address]
-
-            # Only add sensors that have the required data
-            for description in SENSOR_DESCRIPTIONS:
-                mapping = SENSOR_VALUE_MAPPING.get(description.key)
-                if mapping and _has_required_data(device_data, mapping.data_keys):
-                    initial_entities.append(DeviceStatisticsSensor(coordinator, description, mac_address))
-
-    # Add initial entities if any
-    if initial_entities:
-        async_add_entities(initial_entities, True)
-        _LOGGER.info("Set up %d initial STA statistics sensors", len(initial_entities))
-
     # Create sync wrapper for async coordinator update handler
     def _handle_coordinator_update():
         """Sync wrapper for async coordinator update handler."""
@@ -561,6 +520,14 @@ async def async_setup_entry(
 
     # Register the update listener
     coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_sta_devices() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial STA sensor data fetch failed, will retry automatically: %s", exc)
+
+    hass.async_create_task(_refresh_sta_devices())
 
     # Return the coordinator for the main sensor module to track
     return coordinator

@@ -142,9 +142,7 @@ async def async_setup_entry(
         f"{DOMAIN}_eth_{entry.data[CONF_HOST]}",
         scan_interval,
     )
-
-    # Fetch initial data
-    await coordinator.async_config_entry_first_refresh()
+    coordinator.known_devices = set()
 
     host = coordinator.data_manager.entry.data[CONF_HOST]
     device_registry = dr.async_get(hass)
@@ -156,10 +154,12 @@ async def async_setup_entry(
         via_device=(DOMAIN, host),  # Link to main router device
     )
 
-    entities = []
+    async def _add_network_interface_entities() -> None:
+        """Add entities for interfaces discovered by the coordinator."""
+        if not coordinator.data or "network_devices" not in coordinator.data:
+            _LOGGER.debug("No network devices found in coordinator data")
+            return
 
-    # Get the network devices from coordinator data
-    if coordinator.data and "network_devices" in coordinator.data:
         network_devices = coordinator.data["network_devices"]
 
         # Validate network devices data structure
@@ -170,7 +170,11 @@ async def async_setup_entry(
         _LOGGER.info("Found %d network devices", len(network_devices))
         _LOGGER.debug("Network devices data: %s", network_devices)
 
+        entities = []
         for device_name, device_data in network_devices.items():
+            if device_name in coordinator.known_devices:
+                continue
+
             # Skip invalid entries
             if not isinstance(device_data, dict):
                 _LOGGER.debug("Skipping invalid device data for %s", device_name)
@@ -192,11 +196,24 @@ async def async_setup_entry(
                         device_name,
                     )
                 )
-    else:
-        _LOGGER.warning("No network devices found in coordinator data")
+            coordinator.known_devices.add(device_name)
 
-    async_add_entities(entities, True)
-    _LOGGER.info("Created %d network interface sensor entities", len(entities))
+        if entities:
+            async_add_entities(entities, False)
+            _LOGGER.info("Created %d network interface sensor entities", len(entities))
+
+    def _handle_coordinator_update() -> None:
+        hass.async_create_task(_add_network_interface_entities())
+
+    coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_network_devices() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial network interface data fetch failed, will retry automatically: %s", exc)
+
+    hass.async_create_task(_refresh_network_devices())
 
     # Return the coordinator for the main sensor setup
     return coordinator

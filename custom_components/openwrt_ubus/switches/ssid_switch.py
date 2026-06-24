@@ -46,38 +46,51 @@ async def async_setup_entry(
         SCAN_INTERVAL,
     )
 
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as exc:
-        _LOGGER.warning("Initial SSID data fetch failed for %s: %s", entry.data[CONF_HOST], exc)
-        return
+    created_ssids = set()
 
-    ssid_data = coordinator.data.get("ssid_status", {})
-    if not ssid_data:
-        _LOGGER.warning("No wireless interfaces found on %s", entry.data[CONF_HOST])
-        return
+    async def _add_ssid_switches() -> None:
+        ssid_data = coordinator.data.get("ssid_status", {}) if coordinator.data else {}
+        if not ssid_data:
+            _LOGGER.warning("No wireless interfaces found on %s", entry.data[CONF_HOST])
+            return
 
-    # Group UCI sections by SSID name so we get one switch per SSID
-    # (each SSID typically has one section per radio band).
-    ssid_groups: dict[str, list[str]] = {}
-    for section_name, iface_data in ssid_data.items():
-        if not isinstance(iface_data, dict) or iface_data.get("mode", "ap") != "ap":
-            continue
-        ssid = iface_data.get("ssid", section_name)
-        ssid_groups.setdefault(ssid, []).append(section_name)
+        # Group UCI sections by SSID name so we get one switch per SSID
+        # (each SSID typically has one section per radio band).
+        ssid_groups: dict[str, list[str]] = {}
+        for section_name, iface_data in ssid_data.items():
+            if not isinstance(iface_data, dict) or iface_data.get("mode", "ap") != "ap":
+                continue
+            ssid = iface_data.get("ssid", section_name)
+            if ssid in created_ssids:
+                continue
+            ssid_groups.setdefault(ssid, []).append(section_name)
 
-    entities = [
-        OpenwrtSSIDSwitch(coordinator, ssid, sections, entry)
-        for ssid, sections in ssid_groups.items()
-    ]
+        entities = [
+            OpenwrtSSIDSwitch(coordinator, ssid, sections, entry)
+            for ssid, sections in ssid_groups.items()
+        ]
 
-    if entities:
-        async_add_entities(entities, True)
-        _LOGGER.info(
-            "Created %d SSID switch entities for %s",
-            len(entities),
-            entry.data[CONF_HOST],
-        )
+        if entities:
+            async_add_entities(entities, False)
+            created_ssids.update(ssid_groups)
+            _LOGGER.info(
+                "Created %d SSID switch entities for %s",
+                len(entities),
+                entry.data[CONF_HOST],
+            )
+
+    def _handle_coordinator_update() -> None:
+        hass.async_create_task(_add_ssid_switches())
+
+    coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_ssids() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial SSID data fetch failed for %s: %s", entry.data[CONF_HOST], exc)
+
+    hass.async_create_task(_refresh_ssids())
 
 
 class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):

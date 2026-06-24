@@ -12,7 +12,6 @@ from homeassistant.components.light import ATTR_EFFECT, ColorMode, LightEntity, 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -117,41 +116,25 @@ async def async_setup_entry(
         if not new_leds and not new_entities:
             return
 
-        entity_registry = er.async_get(hass)
-
         for led_name in sorted(new_leds):
-            unique_id = f"{entry.data[CONF_HOST]}_led_{led_name}"
-            if entity_registry.async_get_entity_id("light", DOMAIN, unique_id):
-                coordinator.known_leds.add(led_name)
-                continue
-
             new_entities.append(OpenwrtLedLight(coordinator, entry, led_name))
             coordinator.known_leds.add(led_name)
 
         if new_entities:
-            async_add_entities(new_entities, True)
-
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as exc:
-        _LOGGER.debug("Initial LED data fetch failed: %s", exc)
-
-    entities = []
-    led_data = coordinator.data.get("leds", {})
-    if isinstance(led_data, dict):
-        entities.append(OpenwrtLedLightGroup(coordinator, entry, sorted(led_data)))
-        coordinator.group_added = True
-        for led_name in sorted(led_data):
-            entities.append(OpenwrtLedLight(coordinator, entry, led_name))
-            coordinator.known_leds.add(led_name)
-
-    if entities:
-        async_add_entities(entities, True)
+            async_add_entities(new_entities, False)
 
     def _handle_coordinator_update() -> None:
         hass.async_create_task(_add_new_led_entities())
 
     coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_leds() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.debug("Initial LED data fetch failed: %s", exc)
+
+    hass.async_create_task(_refresh_leds())
 
 
 class OpenwrtLedLight(CoordinatorEntity, LightEntity):

@@ -329,12 +329,16 @@ async def async_setup_entry(
                 created_buttons.discard(button_id)
                 button_entities.pop(button_id, None)
 
-    # Initial setup
-    await coordinator.async_config_entry_first_refresh()
-    _async_add_kick_buttons()
-
     # Listen for coordinator updates to refresh buttons
     coordinator.async_add_listener(_async_add_kick_buttons)
+
+    async def _refresh_device_kick_buttons() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial device kick button data fetch failed, will retry automatically: %s", exc)
+
+    hass.async_create_task(_refresh_device_kick_buttons())
 
     # Return None to indicate we don't need tracking in button.py
     return None

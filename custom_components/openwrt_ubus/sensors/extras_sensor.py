@@ -51,40 +51,29 @@ async def async_setup_entry(
         if not new_interfaces:
             return
 
-        entity_registry = er.async_get(hass)
         new_entities = []
 
         for interface in sorted(new_interfaces):
-            unique_id = f"{entry.data[CONF_HOST]}_vnstat_{interface}_monthly_traffic"
-            if entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id):
-                coordinator.known_vnstat_interfaces.add(interface)
-                continue
-
             new_entities.append(OpenwrtVnstatMonthlySensor(coordinator, entry, interface))
             coordinator.known_vnstat_interfaces.add(interface)
 
         if new_entities:
-            async_add_entities(new_entities, True)
+            async_add_entities(new_entities, False)
 
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as exc:
-        _LOGGER.debug("Initial extras data fetch failed: %s", exc)
-
-    entities = [OpenwrtSpeedtestSensor(coordinator, entry)]
-
-    vnstat_data = coordinator.data.get("vnstat_monthly", {})
-    if isinstance(vnstat_data, dict):
-        for interface in sorted(vnstat_data):
-            entities.append(OpenwrtVnstatMonthlySensor(coordinator, entry, interface))
-            coordinator.known_vnstat_interfaces.add(interface)
-
-    async_add_entities(entities, True)
+    async_add_entities([OpenwrtSpeedtestSensor(coordinator, entry)], False)
 
     def _handle_coordinator_update() -> None:
         hass.async_create_task(_add_new_vnstat_entities())
 
     coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_extras() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.debug("Initial extras data fetch failed: %s", exc)
+
+    hass.async_create_task(_refresh_extras())
 
 
 class OpenwrtExtraSensor(CoordinatorEntity, SensorEntity):
