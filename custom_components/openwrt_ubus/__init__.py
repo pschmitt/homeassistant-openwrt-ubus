@@ -139,50 +139,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if session_id is None:
             raise ConfigEntryNotReady(f"Failed to connect to OpenWrt device at {hostname}")
 
-        import asyncio
-
-        async def _check_availability(check_name: str, create_coro) -> bool:
-            """Run an availability check with retries for resilience during startup bursts."""
-            for attempt in range(1, 4):
-                try:
-                    result = await create_coro()
-                    # list_mwan3 etc can return empty lists/dicts if not supported gracefully
-                    if result:
-                        _LOGGER.debug("%s availability check: True", check_name)
-                        return True
-                    _LOGGER.debug("%s availability check returned False/None/Empty", check_name)
-                    return False
-                except Exception as exc:
-                    err_str = str(exc)
-                    # Don't retry permission errors
-                    if "Access denied" in err_str or type(exc).__name__ in ("PermissionError",):
-                        _LOGGER.debug("%s check failed (Permission Denied): %s", check_name, exc)
-                        return False
-                    
-                    _LOGGER.debug("%s check failed (attempt %d/3): %s", check_name, attempt, exc)
-                    if attempt < 3:
-                        await asyncio.sleep(2)
-            
-            return False
-
-        # Check for modem_ctrl availability and store the result
-        modem_ctrl_available = await _check_availability(
-            "Modem_ctrl", lambda: ubus.list_modem_ctrl()
-        )
-        hass.data[DOMAIN]["modem_ctrl_available"] = modem_ctrl_available
-
-        # Check for mwan3 availability and store the result
-        mwan3_available = await _check_availability(
-            "MWAN3", lambda: ubus.list_mwan3()
-        )
-        hass.data[DOMAIN]["mwan3_available"] = mwan3_available
-
-        # Check for nlbwmon availability/permission and store the result
-        nlbwmon_available = await _check_availability(
-            "nlbwmon", lambda: ubus.file_exec("/usr/sbin/nlbw", ["-h"])
-        )
-        hass.data[DOMAIN]["nlbwmon_available"] = nlbwmon_available
-
         # Close the test connection — logout first to destroy the rpcd session,
         # otherwise the session lingers until rpcd's own 300 s GC runs.
         await ubus.logout()
@@ -484,7 +440,7 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         for name, enabled, main_id in sensors:
             if enabled:
                 continue
-            main_device = device_registry.async_get_device(identifiers={(DOMAIN, f"{host}_eth")})
+            main_device = device_registry.async_get_device(identifiers={(DOMAIN, main_id)})
             if not main_device:
                 continue
             removed_count = 0
@@ -532,12 +488,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Clean up device kick coordinators
         if "device_kick_coordinators" in hass.data[DOMAIN]:
             hass.data[DOMAIN]["device_kick_coordinators"].pop(entry.entry_id, None)
-
-        # Clean up modem_ctrl availability data if no more entries
-        if len([e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id]) == 0:
-            hass.data[DOMAIN].pop("modem_ctrl_available", None)
-
-        hass.data[DOMAIN].pop("mwan3_available", None)
 
     return unload_ok
 
