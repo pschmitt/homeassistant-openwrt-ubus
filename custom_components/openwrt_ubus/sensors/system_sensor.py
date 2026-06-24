@@ -244,16 +244,21 @@ async def async_setup_entry(
         f"{DOMAIN}_system_{entry.data[CONF_HOST]}",
         scan_interval,
     )
-
-    # Fetch initial data
-    await coordinator.async_config_entry_first_refresh()
+    coordinator.known_temperature_sensors = set()
 
     entities = [SystemInfoSensor(coordinator, description) for description in SENSOR_DESCRIPTIONS]
+    async_add_entities(entities, False)
 
-    # Add temperature sensors dynamically based on available sensors
-    if coordinator.data and "system_temperatures" in coordinator.data:
+    async def _add_temperature_entities() -> None:
+        if not coordinator.data or "system_temperatures" not in coordinator.data:
+            return
+
         temperatures = coordinator.data["system_temperatures"]
+        entities = []
         for sensor_name, temp_value in temperatures.items():
+            if sensor_name in coordinator.known_temperature_sensors:
+                continue
+
             # Normalize key to snake_case: kernel names may contain hyphens
             # (e.g. "cpu-thermal-0") which would break the integration's
             # snake_case-only convention for keys and unique_ids.
@@ -271,8 +276,23 @@ async def async_setup_entry(
                 entity_category=None,
             )
             entities.append(SystemInfoSensor(coordinator, temp_description))
+            coordinator.known_temperature_sensors.add(sensor_name)
 
-    async_add_entities(entities, True)
+        if entities:
+            async_add_entities(entities, False)
+
+    def _handle_coordinator_update() -> None:
+        hass.async_create_task(_add_temperature_entities())
+
+    coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_system() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial system sensor data fetch failed, will retry automatically: %s", exc)
+
+    hass.async_create_task(_refresh_system())
 
     return coordinator
 

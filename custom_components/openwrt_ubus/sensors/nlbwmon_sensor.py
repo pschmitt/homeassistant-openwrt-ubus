@@ -58,8 +58,15 @@ async def async_setup_entry(
         SCAN_INTERVAL,
     )
 
-    await coordinator.async_config_entry_first_refresh()
-    async_add_entities([NLBWTopHostsSensor(coordinator, SENSOR_DESCRIPTION)], True)
+    async_add_entities([NLBWTopHostsSensor(coordinator, SENSOR_DESCRIPTION)], False)
+
+    async def _refresh_nlbwmon() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial nlbwmon data fetch failed, will retry automatically: %s", exc)
+
+    hass.async_create_task(_refresh_nlbwmon())
     return coordinator
 
 

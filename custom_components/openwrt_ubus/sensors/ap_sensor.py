@@ -311,25 +311,11 @@ async def async_setup_entry(
         if new_devices:
             _LOGGER.info("Found %d new AP devices: %s", len(new_devices), new_devices)
 
-            # Get entity registry to check for existing entities
-            entity_registry = er.async_get(hass)
-
             new_entities = []
             for ap_device in new_devices:
                 # Check each sensor type for this device
                 device_sensors_to_add = []
                 for description in SENSOR_DESCRIPTIONS:
-                    unique_id = f"{entry.data[CONF_HOST]}_ap_{ap_device}_{description.key}"
-                    existing_entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-
-                    if existing_entity_id:
-                        _LOGGER.debug(
-                            "AP sensor entity %s already exists with entity_id %s, skipping creation",
-                            unique_id,
-                            existing_entity_id,
-                        )
-                        continue
-
                     # Check if sensor has required data
                     if description.key == "clients":
                         # clients sensor doesn't need data from ap_info
@@ -350,7 +336,7 @@ async def async_setup_entry(
 
             # Add new entities only if there are any
             if new_entities:
-                async_add_entities(new_entities, True)
+                async_add_entities(new_entities, False)
                 _LOGGER.info(
                     "Created %d AP sensor entities for %d new devices",
                     len(new_entities),
@@ -371,9 +357,6 @@ async def async_setup_entry(
             for ap_device in removed_devices:
                 coordinator.known_devices.discard(ap_device)
 
-    # Perform first refresh
-    await coordinator.async_config_entry_first_refresh()
-
     host = coordinator.data_manager.entry.data[CONF_HOST]
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
@@ -385,29 +368,7 @@ async def async_setup_entry(
     )
 
     # Add the single "Total Wireless Clients" sensor on the hub device
-    async_add_entities([TotalWirelessClientsSensor(coordinator)], True)
-
-    # Add initial sensors for any devices already discovered
-    initial_entities = []
-    if coordinator.data and coordinator.data.get("ap_info"):
-        ap_info_data = coordinator.data["ap_info"]
-        for ap_device in ap_info_data:
-            coordinator.known_devices.add(ap_device)
-            ap_data = ap_info_data[ap_device]
-
-            # Only add sensors that have the required data
-            for description in SENSOR_DESCRIPTIONS:
-                if description.key == "clients":
-                    initial_entities.append(ApSensor(coordinator, description, ap_device))
-                else:
-                    mapping = SENSOR_VALUE_MAPPING.get(description.key)
-                    if mapping and _has_required_data(ap_data, mapping.data_keys):
-                        initial_entities.append(ApSensor(coordinator, description, ap_device))
-
-    # Add initial entities if any
-    if initial_entities:
-        async_add_entities(initial_entities, True)
-        _LOGGER.info("Set up %d initial AP sensors", len(initial_entities))
+    async_add_entities([TotalWirelessClientsSensor(coordinator)], False)
 
     # Create sync wrapper for async coordinator update handler
     def _handle_coordinator_update():
@@ -416,6 +377,14 @@ async def async_setup_entry(
 
     # Register the update listener
     coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_ap_devices() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial AP sensor data fetch failed, will retry automatically: %s", exc)
+
+    hass.async_create_task(_refresh_ap_devices())
 
     # Return the coordinator for the main sensor module to track
     return coordinator

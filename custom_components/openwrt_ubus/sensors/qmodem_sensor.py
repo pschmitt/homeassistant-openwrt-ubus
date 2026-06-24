@@ -218,17 +218,22 @@ async def async_setup_entry(
         scan_interval,
     )
 
-    # Fetch initial data
-    await coordinator.async_config_entry_first_refresh()
-    if not coordinator.data or not coordinator.data.get("qmodem_info"):
-        _LOGGER.info("QModem entities not created - modem_ctrl is not available")
-        return None
+    async def _refresh_qmodem() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial QModem data fetch failed, will retry automatically: %s", exc)
+            return
 
-    # Create QModem sensor entities
-    entities = [QModemSensor(coordinator, description) for description in SENSOR_DESCRIPTIONS]
-    async_add_entities(entities, True)
-    _LOGGER.info("QModem entities created - modem_ctrl is available")
+        if not coordinator.data or not coordinator.data.get("qmodem_info"):
+            _LOGGER.info("QModem entities not created - modem_ctrl is not available")
+            return
 
+        entities = [QModemSensor(coordinator, description) for description in SENSOR_DESCRIPTIONS]
+        async_add_entities(entities, False)
+        _LOGGER.info("QModem entities created - modem_ctrl is available")
+
+    hass.async_create_task(_refresh_qmodem())
     return coordinator
 
 

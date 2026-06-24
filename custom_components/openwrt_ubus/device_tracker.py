@@ -269,52 +269,26 @@ async def async_setup_entry(
             _LOGGER.info("Found %d new devices for tracking: %s", len(new_devices), new_devices)
             new_entities = await _create_entities_for_devices(hass, entry, coordinator, new_devices)
             if new_entities:
-                async_add_entities(new_entities, True)
+                async_add_entities(new_entities, False)
                 _LOGGER.info("Created %d device tracker entities", len(new_entities))
 
     def _handle_coordinator_update():
         """Sync wrapper for coordinator update handler."""
         hass.async_create_task(_handle_coordinator_update_async())
 
-    # Fetch initial data
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except Exception as exc:
-        _LOGGER.warning("Initial data fetch failed, will retry automatically: %s", exc)
-
-    # Create device tracker entities for each detected device
-    if coordinator.data:
-        # Merge device_statistics and wired_devices
-        all_devices = {}
-        
-        # Add WiFi devices
-        if "device_statistics" in coordinator.data:
-            device_stats = coordinator.data["device_statistics"]
-            all_devices.update(device_stats)
-        
-        # Add wired devices
-        if enable_wired_tracker and "wired_devices" in coordinator.data:
-            wired_devices = coordinator.data["wired_devices"]
-            # Merge wired devices, but WiFi devices take priority
-            for mac, device_info in wired_devices.items():
-                if mac not in all_devices:
-                    all_devices[mac] = device_info
-
-        device_macs = set(all_devices.keys())
-        _LOGGER.info("Initial scan found %d devices", len(device_macs))
-        _LOGGER.debug("Initial devices detected: %s", device_macs)
-
-        new_entities = await _create_entities_for_devices(hass, entry, coordinator, device_macs)
-        if new_entities:
-            async_add_entities(new_entities, True)
-            _LOGGER.info("Created %d initial device tracker entities", len(new_entities))
-        else:
-            _LOGGER.info("No new entities to create (all devices already exist)")
-    else:
-        _LOGGER.info("No devices found in initial scan, entities will be created dynamically as devices are discovered")
-
     # Register the update listener
     coordinator.async_add_listener(_handle_coordinator_update)
+
+    async def _refresh_device_trackers() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial data fetch failed, will retry automatically: %s", exc)
+            return
+
+        await _handle_coordinator_update_async()
+
+    hass.async_create_task(_refresh_device_trackers())
 
 
 async def _restore_known_devices_from_registry(

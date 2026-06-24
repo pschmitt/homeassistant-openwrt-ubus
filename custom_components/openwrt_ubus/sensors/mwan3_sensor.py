@@ -204,25 +204,11 @@ async def async_setup_entry(
         if new_interfaces:
             _LOGGER.info("Found %d new MWAN3 interfaces: %s", len(new_interfaces), new_interfaces)
 
-            # Get entity registry to check for existing entities
-            entity_registry = er.async_get(hass)
-
             new_entities = []
             for interface in new_interfaces:
                 # Check each sensor type for this interface
                 interface_sensors_to_add = []
                 for description in INTERFACE_SENSOR_DESCRIPTIONS:
-                    unique_id = f"{entry.data[CONF_HOST]}_mwan3_intf_{interface}_{description.key}"
-                    existing_entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-
-                    if existing_entity_id:
-                        _LOGGER.info(
-                            "MWAN3 sensor %s already exists as %s, skipping",
-                            unique_id,
-                            existing_entity_id,
-                        )
-                        continue
-
                     # Check if interface has required data
                     interface_data = interfaces.get(interface, {})
                     if isinstance(interface_data, dict) and interface_data:
@@ -241,7 +227,7 @@ async def async_setup_entry(
 
             # Add new entities only if there are any
             if new_entities:
-                async_add_entities(new_entities, True)
+                async_add_entities(new_entities, False)
                 _LOGGER.debug("Added %d new MWAN3 interface entities", len(new_entities))
 
         # Handle new policies
@@ -258,25 +244,11 @@ async def async_setup_entry(
         if new_policies:
             _LOGGER.info("Found %d new MWAN3 policies: %s", len(new_policies), new_policies)
 
-            # Get entity registry to check for existing entities
-            entity_registry = er.async_get(hass)
-
             new_policy_entities = []
             for policy in new_policies:
                 # Check each sensor type for this policy
                 policy_sensors_to_add = []
                 for description in POLICY_SENSOR_DESCRIPTIONS:
-                    unique_id = f"{entry.data[CONF_HOST]}_mwan3_policy_{policy}_{description.key}"
-                    existing_entity_id = entity_registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-
-                    if existing_entity_id:
-                        _LOGGER.debug(
-                            "MWAN3 policy sensor %s already exists as %s, skipping",
-                            unique_id,
-                            existing_entity_id,
-                        )
-                        continue
-
                     # Always add policy sensors (they handle empty policies)
                     policy_sensors_to_add.append(description)
 
@@ -290,7 +262,7 @@ async def async_setup_entry(
 
             # Add new policy entities only if there are any
             if new_policy_entities:
-                async_add_entities(new_policy_entities, True)
+                async_add_entities(new_policy_entities, False)
                 _LOGGER.debug("Added %d new MWAN3 policy entities", len(new_policy_entities))
 
     # Create sync wrapper for async coordinator update handler
@@ -300,12 +272,6 @@ async def async_setup_entry(
 
     # Register the update listener
     coordinator.async_add_listener(_handle_coordinator_update)
-
-    # Fetch initial data to potentially create initial entities
-    await coordinator.async_config_entry_first_refresh()
-    if not coordinator.data or not coordinator.data.get("mwan3_status"):
-        _LOGGER.info("MWAN3 entities not created - mwan3 is not available")
-        return None
 
     host = coordinator.data_manager.entry.data[CONF_HOST]
     device_registry = dr.async_get(hass)
@@ -317,57 +283,20 @@ async def async_setup_entry(
         via_device=(DOMAIN, host),  # Link to main router device
     )
 
-    # Create initial entities for existing interfaces and policies
-    initial_entities = []
+    async def _refresh_mwan3() -> None:
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial MWAN3 data fetch failed, will retry automatically: %s", exc)
+            return
 
-    # Create entities for existing interfaces and policies if data is available
-    if coordinator.data and "mwan3_status" in coordinator.data:
-        mwan3_data = coordinator.data["mwan3_status"]
-        if isinstance(mwan3_data, dict):
-            # Create interface entities
-            interfaces = mwan3_data.get("interfaces", {})
-            if isinstance(interfaces, dict):
-                for interface in interfaces:
-                    interface_data = interfaces.get(interface)
-                    if isinstance(interface_data, dict) and interface_data:
-                        initial_entities.extend(
-                            [
-                                MWAN3InterfaceSensor(coordinator, description, interface)
-                                for description in INTERFACE_SENSOR_DESCRIPTIONS
-                            ]
-                        )
-                        coordinator.known_interfaces.add(interface)
+        if not coordinator.data or not coordinator.data.get("mwan3_status"):
+            _LOGGER.info("MWAN3 entities not created - mwan3 is not available")
+            return
 
-            # Create policy entities
-            policies = mwan3_data.get("policies", {})
-            if isinstance(policies, dict):
-                current_policies = set()
-                # Collect all policy names from both IPv4 and IPv6
-                for ip_version in ["ipv4", "ipv6"]:
-                    ip_policies = policies.get(ip_version)
-                    if isinstance(ip_policies, dict):
-                        current_policies.update(ip_policies.keys())
+        _LOGGER.info("MWAN3 coordinator and global entities created - mwan3 is available")
 
-                for policy in current_policies:
-                    initial_entities.extend(
-                        [
-                            MWAN3PolicySensor(coordinator, description, policy)
-                            for description in POLICY_SENSOR_DESCRIPTIONS
-                        ]
-                    )
-                    coordinator.known_policies.add(policy)
-
-    # Add all initial entities
-    if initial_entities:
-        async_add_entities(initial_entities, True)
-        _LOGGER.info(
-            "Created %d initial MWAN3 entities (%d interfaces, %d policies)",
-            len(initial_entities),
-            len(coordinator.known_interfaces),
-            len(coordinator.known_policies),
-        )
-
-    _LOGGER.info("MWAN3 coordinator and global entities created - mwan3 is available")
+    hass.async_create_task(_refresh_mwan3())
     return coordinator
 
 
