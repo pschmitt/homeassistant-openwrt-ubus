@@ -262,6 +262,22 @@ async def async_setup_entry(
                     ap_ssid,
                     ap_device,
                 )
+            else:
+                # Button already exists — update fallback name if hostname changed on router
+                existing = button_entities[button_id]
+                new_hostname = device_info.get("hostname")
+                if (
+                    new_hostname
+                    and new_hostname not in (mac, "*")
+                    and new_hostname != existing._initial_device_name
+                ):
+                    _LOGGER.debug(
+                        "Hostname changed for %s: %s → %s, updating button name",
+                        mac,
+                        existing._initial_device_name,
+                        new_hostname,
+                    )
+                    existing._initial_device_name = new_hostname
 
             # Mark button as seen in this update cycle
             created_buttons.add(button_id)
