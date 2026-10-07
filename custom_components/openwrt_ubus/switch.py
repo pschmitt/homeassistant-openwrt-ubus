@@ -72,7 +72,9 @@ async def async_setup_entry(
                 except Exception as exc:
                     _LOGGER.warning("Initial service data fetch failed, will retry automatically: %s", exc)
 
-            hass.async_create_task(_refresh_service_status())
+            entry.async_create_background_task(
+                hass, _refresh_service_status(), "openwrt_ubus_refresh_service_status"
+            )
 
     # SSID enable/disable switches (independent of service controls)
     await async_setup_ssid_switches(hass, entry, async_add_entities)

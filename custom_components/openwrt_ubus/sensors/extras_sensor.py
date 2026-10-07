@@ -73,7 +73,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.debug("Initial extras data fetch failed: %s", exc)
 
-    hass.async_create_task(_refresh_extras())
+    entry.async_create_background_task(
+        hass, _refresh_extras(), "openwrt_ubus_refresh_extras"
+    )
 
 
 class OpenwrtExtraSensor(CoordinatorEntity, SensorEntity):

@@ -214,7 +214,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial network interface data fetch failed, will retry automatically: %s", exc)
 
-    hass.async_create_task(_refresh_network_devices())
+    entry.async_create_background_task(
+        hass, _refresh_network_devices(), "openwrt_ubus_refresh_network_devices"
+    )
 
     # Return the coordinator for the main sensor setup
     return coordinator

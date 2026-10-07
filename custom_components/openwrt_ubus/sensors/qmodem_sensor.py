@@ -234,7 +234,9 @@ async def async_setup_entry(
         async_add_entities(entities, False)
         _LOGGER.info("QModem entities created - modem_ctrl is available")
 
-    hass.async_create_task(_refresh_qmodem())
+    entry.async_create_background_task(
+        hass, _refresh_qmodem(), "openwrt_ubus_refresh_qmodem"
+    )
     return coordinator
 
 

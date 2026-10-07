@@ -100,7 +100,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial SSID data fetch failed for %s: %s", entry.data[CONF_HOST], exc)
 
-    hass.async_create_task(_refresh_ssids())
+    entry.async_create_background_task(
+        hass, _refresh_ssids(), "openwrt_ubus_refresh_ssids"
+    )
 
 
 class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
