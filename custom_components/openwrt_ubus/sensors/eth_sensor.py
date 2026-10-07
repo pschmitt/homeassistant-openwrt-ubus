@@ -245,7 +245,7 @@ class NetworkInterfaceSensor(CoordinatorEntity, SensorEntity):
             name=f"{device_name}",
             manufacturer="OpenWrt",
             model=self._get_device_type(),
-            **via_device_kwargs(coordinator.hass, f"{self._host}_eth", coordinator.coordinator.data_manager.entry.entry_id),  # Link to main router device
+            **via_device_kwargs(coordinator.hass, f"{self._host}_eth", coordinator.data_manager.entry.entry_id),  # Link to main router device
         )
 
     def _get_device_type(self) -> str:
