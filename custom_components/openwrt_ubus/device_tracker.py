@@ -28,6 +28,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from .device_helpers import via_device_kwargs
 from .const import (
     CONF_DHCP_SOFTWARE,
     CONF_WIRELESS_SOFTWARE,
@@ -521,7 +522,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         # For uniqueid tracking, don't set via_device since device can roam between routers
         # For combined tracking, set via_device to local AP
         if self._tracking_method == "combined" and self.ap_device != "Unknown AP":
-            device_info_dict["via_device"] = (DOMAIN, self.via_device)
+            device_info_dict.update(
+                via_device_kwargs(self.hass, self.via_device, self.coordinator.data_manager.entry.entry_id)
+            )
 
         return DeviceInfo(**device_info_dict)
 

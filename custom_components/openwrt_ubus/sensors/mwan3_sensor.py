@@ -24,6 +24,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from ..device_helpers import via_device_kwargs
 from ..const import (
     DOMAIN,
     CONF_USE_HTTPS,
@@ -280,7 +281,7 @@ async def async_setup_entry(
         identifiers={(DOMAIN, f"{host}_mwan3")},
         name=f"{host} MWAN3 Interfaces and Policies",
         manufacturer="OpenWrt",
-        via_device=(DOMAIN, host),  # Link to main router device
+        **via_device_kwargs(hass, host, entry.entry_id),  # Link to main router device
     )
 
     async def _refresh_mwan3() -> None:
@@ -332,7 +333,7 @@ class MWAN3InterfaceSensor(CoordinatorEntity, SensorEntity):
                 self.coordinator.data_manager.entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS),
                 self.coordinator.data_manager.entry.data.get(CONF_PORT),
             ),
-            via_device=(DOMAIN, f"{self._host}_mwan3"),
+            **via_device_kwargs(self.hass, f"{self._host}_mwan3", self.coordinator.data_manager.entry.entry_id),
         )
 
     @property
@@ -488,7 +489,7 @@ class MWAN3PolicySensor(CoordinatorEntity, SensorEntity):
                 self.coordinator.data_manager.entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS),
                 self.coordinator.data_manager.entry.data.get(CONF_PORT),
             ),
-            via_device=(DOMAIN, f"{self._host}_mwan3"),
+            **via_device_kwargs(self.hass, f"{self._host}_mwan3", self.coordinator.data_manager.entry.entry_id),
         )
 
     @property

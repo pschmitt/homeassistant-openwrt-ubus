@@ -367,7 +367,7 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
     # List all current devices for debugging
     all_devices = [
         device
-        for device in device_registry.devices.values()
+        for device in device_registry.devices
         if any(identifier[0] == DOMAIN for identifier in device.identifiers)
     ]
     _LOGGER.debug(
@@ -378,7 +378,7 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
     # If system sensors are disabled, remove the main router device
     # (this will also remove any via_device dependencies like QModem and STA devices)
     if not system_enabled:
-        main_device = device_registry.async_get_device(identifiers={(DOMAIN, host)})
+        main_device = device_registry.async_get_device_by_identifier((DOMAIN, host), entry.entry_id)
         if main_device:
             _LOGGER.info("Removing main router device %s (system sensors disabled)", host)
             device_registry.async_remove_device(main_device.id)
@@ -389,7 +389,7 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         # only remove the QModem device
         if not qmodem_enabled:
             qmodem_identifier = (DOMAIN, f"{host}_qmodem")
-            qmodem_device = device_registry.async_get_device(identifiers={qmodem_identifier})
+            qmodem_device = device_registry.async_get_device_by_identifier(qmodem_identifier, entry.entry_id)
             if qmodem_device:
                 _LOGGER.info(
                     "Removing QModem device %s (QModem sensors disabled)",
@@ -399,7 +399,7 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
             else:
                 _LOGGER.debug("QModem device not found for removal: %s", f"{host}_qmodem")
                 # Check if device exists with different identifier pattern
-                for device in device_registry.devices.values():
+                for device in device_registry.devices:
                     for identifier in device.identifiers:
                         if identifier[0] == DOMAIN and "_qmodem" in str(identifier[1]):
                             _LOGGER.debug("Found QModem-like device: %s", identifier)
@@ -408,9 +408,9 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         if not sta_enabled:
             removed_count = 0
             # Find all devices that have via_device pointing to the main router
-            for device in list(device_registry.devices.values()):  # Use list() to avoid modification during iteration
+            for device in list(device_registry.devices):  # Use list() to avoid modification during iteration
                 if device.via_device_id:
-                    via_device = device_registry.devices.get(device.via_device_id)
+                    via_device = device_registry.async_get(device.via_device_id)
                     if via_device and (DOMAIN, host) in via_device.identifiers:
                         # This device is connected via the main router, check if it's a STA device
                         for identifier in device.identifiers:
@@ -440,11 +440,11 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         for name, enabled, main_id in sensors:
             if enabled:
                 continue
-            main_device = device_registry.async_get_device(identifiers={(DOMAIN, main_id)})
+            main_device = device_registry.async_get_device_by_identifier((DOMAIN, main_id), entry.entry_id)
             if not main_device:
                 continue
             removed_count = 0
-            for device in list(device_registry.devices.values()):  # Use list() to avoid modification during iteration
+            for device in list(device_registry.devices):  # Use list() to avoid modification during iteration
                 if device.via_device_id == main_device.id:
                     device_registry.async_remove_device(device.id)
                     removed_count += 1

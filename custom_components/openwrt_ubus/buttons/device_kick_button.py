@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers import entity_registry as er
 from homeassistant.exceptions import HomeAssistantError
 
+from ..device_helpers import via_device_kwargs
 from ..const import DOMAIN, CONF_TRACKING_METHOD, DEFAULT_TRACKING_METHOD, normalize_ap_device_name
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
@@ -456,7 +457,9 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
         # For uniqueid tracking, don't set via_device since device can roam between APs
         # For combined tracking, set via_device to local AP
         if self._tracking_method == "combined" and ap_device != "unknown":
-            device_info_dict["via_device"] = (DOMAIN, f"{self._host}_ap_{ap_device}")
+            device_info_dict.update(
+                via_device_kwargs(self.hass, f"{self._host}_ap_{ap_device}", self.coordinator.data_manager.entry.entry_id)
+            )
 
         return DeviceInfo(**device_info_dict)
 

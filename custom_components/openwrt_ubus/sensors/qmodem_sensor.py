@@ -29,6 +29,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from ..device_helpers import via_device_kwargs
 from ..const import (
     DOMAIN,
     CONF_USE_HTTPS,
@@ -291,7 +292,7 @@ class QModemSensor(CoordinatorEntity, SensorEntity):
                 self.coordinator.data_manager.entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS),
                 self.coordinator.data_manager.entry.data.get(CONF_PORT),
             ),
-            via_device=(DOMAIN, self._host),
+            **via_device_kwargs(self.hass, self._host, self.coordinator.data_manager.entry.entry_id),
         )
 
     @property
