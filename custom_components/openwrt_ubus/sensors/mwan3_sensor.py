@@ -297,7 +297,9 @@ async def async_setup_entry(
 
         _LOGGER.info("MWAN3 coordinator and global entities created - mwan3 is available")
 
-    hass.async_create_task(_refresh_mwan3())
+    entry.async_create_background_task(
+        hass, _refresh_mwan3(), "openwrt_ubus_refresh_mwan3"
+    )
     return coordinator
 
 

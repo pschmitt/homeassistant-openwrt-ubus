@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import timedelta
 from typing import Any
 
@@ -46,6 +47,7 @@ from .const import (
 from .shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+_BARE_MAC_RE = re.compile(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}")
 
 SCAN_INTERVAL = timedelta(seconds=30)
 
@@ -289,7 +291,9 @@ async def async_setup_entry(
 
         await _handle_coordinator_update_async()
 
-    hass.async_create_task(_refresh_device_trackers())
+    entry.async_create_background_task(
+        hass, _refresh_device_trackers(), "openwrt_ubus_refresh_device_trackers"
+    )
 
 
 async def _restore_known_devices_from_registry(
@@ -321,6 +325,15 @@ async def _restore_known_devices_from_registry(
                     # Use rsplit to handle hostnames with underscores correctly
                     if "_" in entity_entry.unique_id:
                         mac_address = entity_entry.unique_id.rsplit("_", 1)[-1].upper()
+                    elif _BARE_MAC_RE.fullmatch(entity_entry.unique_id):
+                        # Entity created in "uniqueid" mode: the unique_id is
+                        # the bare MAC. Nothing to restore, and not worth a
+                        # warning on every startup.
+                        _LOGGER.debug(
+                            "Skipping bare-MAC unique_id in combined mode: %s",
+                            entity_entry.unique_id,
+                        )
+                        continue
                     else:
                         _LOGGER.warning(
                             "Cannot parse MAC from unique_id: %s (expected format: {host}_{mac})",

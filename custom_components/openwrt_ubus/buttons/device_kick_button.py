@@ -339,7 +339,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial device kick button data fetch failed, will retry automatically: %s", exc)
 
-    hass.async_create_task(_refresh_device_kick_buttons())
+    entry.async_create_background_task(
+        hass, _refresh_device_kick_buttons(), "openwrt_ubus_refresh_device_kick_buttons"
+    )
 
     # Return None to indicate we don't need tracking in button.py
     return None

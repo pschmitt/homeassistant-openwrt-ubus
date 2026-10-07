@@ -292,7 +292,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial system sensor data fetch failed, will retry automatically: %s", exc)
 
-    hass.async_create_task(_refresh_system())
+    entry.async_create_background_task(
+        hass, _refresh_system(), "openwrt_ubus_refresh_system"
+    )
 
     return coordinator
 

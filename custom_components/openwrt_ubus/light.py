@@ -134,7 +134,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.debug("Initial LED data fetch failed: %s", exc)
 
-    hass.async_create_task(_refresh_leds())
+    entry.async_create_background_task(
+        hass, _refresh_leds(), "openwrt_ubus_refresh_leds"
+    )
 
 
 class OpenwrtLedLight(CoordinatorEntity, LightEntity):

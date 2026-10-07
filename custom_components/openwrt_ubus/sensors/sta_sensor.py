@@ -528,7 +528,9 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial STA sensor data fetch failed, will retry automatically: %s", exc)
 
-    hass.async_create_task(_refresh_sta_devices())
+    entry.async_create_background_task(
+        hass, _refresh_sta_devices(), "openwrt_ubus_refresh_sta_devices"
+    )
 
     # Return the coordinator for the main sensor module to track
     return coordinator
