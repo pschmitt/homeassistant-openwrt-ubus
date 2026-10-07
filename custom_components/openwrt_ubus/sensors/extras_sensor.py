@@ -43,7 +43,7 @@ async def async_setup_entry(
     coordinator.known_vnstat_interfaces = set()
 
     async def _add_new_vnstat_entities() -> None:
-        vnstat_data = coordinator.data.get("vnstat_monthly", {})
+        vnstat_data = (coordinator.data or {}).get("vnstat_monthly", {})
         if not isinstance(vnstat_data, dict):
             return
 
@@ -115,12 +115,12 @@ class OpenwrtSpeedtestSensor(OpenwrtExtraSensor):
     @property
     def available(self) -> bool:
         """Return True if a speedtest result is currently available."""
-        return self.coordinator.data.get("speedtest_result") is not None
+        return (self.coordinator.data or {}).get("speedtest_result") is not None
 
     @property
     def native_value(self) -> float | None:
         """Return the current download speed."""
-        data = self.coordinator.data.get("speedtest_result")
+        data = (self.coordinator.data or {}).get("speedtest_result")
         if not isinstance(data, dict):
             return None
 
@@ -129,7 +129,7 @@ class OpenwrtSpeedtestSensor(OpenwrtExtraSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra speedtest attributes."""
-        data = self.coordinator.data.get("speedtest_result")
+        data = (self.coordinator.data or {}).get("speedtest_result")
         if not isinstance(data, dict):
             return {}
 
@@ -167,12 +167,12 @@ class OpenwrtVnstatMonthlySensor(OpenwrtExtraSensor):
     @property
     def available(self) -> bool:
         """Return True if vnstat data for this interface is available."""
-        return self.interface in self.coordinator.data.get("vnstat_monthly", {})
+        return self.interface in (self.coordinator.data or {}).get("vnstat_monthly", {})
 
     @property
     def native_value(self) -> float | None:
         """Return the current monthly traffic total in GiB."""
-        data = self.coordinator.data.get("vnstat_monthly", {}).get(self.interface)
+        data = (self.coordinator.data or {}).get("vnstat_monthly", {}).get(self.interface)
         if not isinstance(data, dict):
             return None
 
@@ -181,7 +181,7 @@ class OpenwrtVnstatMonthlySensor(OpenwrtExtraSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return vnstat traffic details."""
-        data = self.coordinator.data.get("vnstat_monthly", {}).get(self.interface)
+        data = (self.coordinator.data or {}).get("vnstat_monthly", {}).get(self.interface)
         if not isinstance(data, dict):
             return {"interface": self.interface}
 
