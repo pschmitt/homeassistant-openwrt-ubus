@@ -17,7 +17,13 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ..const import DOMAIN, CONF_ENABLE_SSID_SWITCHES, DEFAULT_ENABLE_SSID_SWITCHES
+from ..const import (
+    CONF_ENABLE_SSID_SWITCHES,
+    CONF_WIRELESS_SOFTWARE,
+    DEFAULT_ENABLE_SSID_SWITCHES,
+    DEFAULT_WIRELESS_SOFTWARE,
+    DOMAIN,
+)
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,6 +39,10 @@ async def async_setup_entry(
     """Set up SSID switch entities from a config entry."""
     if not entry.data.get(CONF_ENABLE_SSID_SWITCHES, DEFAULT_ENABLE_SSID_SWITCHES):
         _LOGGER.debug("SSID switches disabled, skipping setup")
+        return
+
+    if entry.data.get(CONF_WIRELESS_SOFTWARE, DEFAULT_WIRELESS_SOFTWARE) == "none":
+        _LOGGER.debug("Wireless software is 'none', skipping SSID switches")
         return
 
     data_manager_key = f"data_manager_{entry.entry_id}"

@@ -28,6 +28,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from ..device_helpers import via_device_kwargs
 from ..const import (
     DOMAIN,
     CONF_AP_SENSOR_TIMEOUT,
@@ -364,7 +365,7 @@ async def async_setup_entry(
         identifiers={(DOMAIN, f"{host}_ap")},
         name=f"{host} Access Points",
         manufacturer="OpenWrt",
-        via_device=(DOMAIN, host),  # Link to main router device
+        **via_device_kwargs(hass, host, entry.entry_id),  # Link to main router device
     )
 
     # Add the single "Total Wireless Clients" sensor on the hub device
@@ -428,7 +429,7 @@ class ApSensor(CoordinatorEntity, SensorEntity):
             name=device_name,
             manufacturer="OpenWrt",
             model="Access Point",
-            via_device=(DOMAIN, f"{self._host}_ap"),
+            **via_device_kwargs(self.hass, f"{self._host}_ap", self.coordinator.data_manager.entry.entry_id),
         )
 
     @property

@@ -24,6 +24,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from ..device_helpers import via_device_kwargs
 from ..const import (
     DOMAIN,
     CONF_STA_SENSOR_TIMEOUT,
@@ -648,7 +649,9 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         # For uniqueid tracking, don't set via_device since device can roam between APs
         # For combined tracking, set via_device to local AP
         if self._tracking_method == "combined" and ap_device != "Unknown AP":
-            device_info_dict["via_device"] = (DOMAIN, f"{self._host}_ap_{ap_device}")
+            device_info_dict.update(
+                via_device_kwargs(self.hass, f"{self._host}_ap_{ap_device}", self.coordinator.data_manager.entry.entry_id)
+            )
 
         return DeviceInfo(**device_info_dict)
 

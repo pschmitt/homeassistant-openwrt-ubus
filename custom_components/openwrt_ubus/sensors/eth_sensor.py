@@ -25,6 +25,7 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
+from ..device_helpers import via_device_kwargs
 from ..const import (
     DOMAIN,
     CONF_SYSTEM_SENSOR_TIMEOUT,
@@ -151,7 +152,7 @@ async def async_setup_entry(
         identifiers={(DOMAIN, f"{host}_eth")},
         name=f"{host} Network Interfaces",
         manufacturer="OpenWrt",
-        via_device=(DOMAIN, host),  # Link to main router device
+        **via_device_kwargs(hass, host, entry.entry_id),  # Link to main router device
     )
 
     async def _add_network_interface_entities() -> None:
@@ -244,7 +245,7 @@ class NetworkInterfaceSensor(CoordinatorEntity, SensorEntity):
             name=f"{device_name}",
             manufacturer="OpenWrt",
             model=self._get_device_type(),
-            via_device=(DOMAIN, f"{self._host}_eth"),  # Link to main router device
+            **via_device_kwargs(coordinator.hass, f"{self._host}_eth", coordinator.coordinator.data_manager.entry.entry_id),  # Link to main router device
         )
 
     def _get_device_type(self) -> str:
