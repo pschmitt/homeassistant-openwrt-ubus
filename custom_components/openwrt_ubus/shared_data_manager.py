@@ -19,7 +19,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from . import API_DEF_TIMEOUT
 from .const import (
     CONF_AP_SENSOR_TIMEOUT,
     CONF_DHCP_SOFTWARE,
@@ -44,6 +43,7 @@ from .const import (
     build_ubus_url,
 )
 from .extended_ubus import ExtendedUbus
+from .Ubus.const import API_DEF_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
