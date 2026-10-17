@@ -10,40 +10,43 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.components.device_tracker import (
     PLATFORM_SCHEMA as DEVICE_TRACKER_PLATFORM_SCHEMA,
+)
+from homeassistant.components.device_tracker import (
     ScannerEntity,
     SourceType,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
+    CONF_IP_ADDRESS,
     CONF_PASSWORD,
     CONF_USERNAME,
     CONF_VERIFY_SSL,
-    CONF_IP_ADDRESS,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from .device_helpers import via_device_kwargs
 from .const import (
     CONF_DHCP_SOFTWARE,
-    CONF_WIRELESS_SOFTWARE,
-    CONF_TRACKING_METHOD,
     CONF_ENABLE_WIRED_TRACKER,
+    CONF_TRACKING_METHOD,
+    CONF_WIRELESS_SOFTWARE,
     DEFAULT_DHCP_SOFTWARE,
-    DEFAULT_WIRELESS_SOFTWARE,
-    DEFAULT_TRACKING_METHOD,
     DEFAULT_ENABLE_WIRED_TRACKER,
+    DEFAULT_TRACKING_METHOD,
+    DEFAULT_WIRELESS_SOFTWARE,
     DHCP_SOFTWARES,
     DOMAIN,
     WIRELESS_SOFTWARES,
     normalize_ap_device_name,
 )
+from .device_helpers import via_device_kwargs
 from .shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,7 +128,9 @@ async def _migrate_device_tracker_unique_ids(
             continue
 
         # Check if new unique_id already exists
-        existing_entity_id = entity_registry.async_get_entity_id("device_tracker", DOMAIN, new_unique_id)
+        existing_entity_id = entity_registry.async_get_entity_id(
+            "device_tracker", DOMAIN, new_unique_id
+        )
 
         if existing_entity_id and existing_entity_id != entity_entry.entity_id:
             _LOGGER.warning(
@@ -165,7 +170,9 @@ PLATFORM_SCHEMA = DEVICE_TRACKER_PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_VERIFY_SSL, default=False): cv.boolean,
         vol.Required(CONF_PASSWORD): cv.string,
         vol.Required(CONF_USERNAME): cv.string,
-        vol.Optional(CONF_WIRELESS_SOFTWARE, default=DEFAULT_WIRELESS_SOFTWARE): vol.In(WIRELESS_SOFTWARES),
+        vol.Optional(CONF_WIRELESS_SOFTWARE, default=DEFAULT_WIRELESS_SOFTWARE): vol.In(
+            WIRELESS_SOFTWARES
+        ),
         vol.Optional(CONF_DHCP_SOFTWARE, default=DEFAULT_DHCP_SOFTWARE): vol.In(DHCP_SOFTWARES),
     }
 )
@@ -250,12 +257,12 @@ async def async_setup_entry(
 
         # Merge device_statistics and wired_devices
         all_devices = {}
-        
+
         # Add WiFi devices
         if "device_statistics" in coordinator.data:
             device_stats = coordinator.data["device_statistics"]
             all_devices.update(device_stats)
-        
+
         # Add wired devices
         if enable_wired_tracker and "wired_devices" in coordinator.data:
             wired_devices = coordinator.data["wired_devices"]
@@ -396,7 +403,9 @@ async def _create_entities_for_devices(
                     break
         else:
             # For combined tracking, use normal lookup (should only exist in current config entry)
-            existing_entity_id = entity_registry.async_get_entity_id("device_tracker", DOMAIN, unique_id)
+            existing_entity_id = entity_registry.async_get_entity_id(
+                "device_tracker", DOMAIN, unique_id
+            )
 
         # Always create entity object - HA will handle duplicates via unique_id
         # This is critical: existing entities in registry need active Python objects too!
@@ -487,7 +496,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         """
         # First try the local coordinator (most likely case)
         device_stats = self.coordinator.data.get("device_statistics", {})
-        device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
+        device_data = device_stats.get(self.mac_address) or device_stats.get(
+            self.mac_address.upper()
+        )
 
         if device_data and device_data.get("connected"):
             return device_data, self._host
@@ -508,7 +519,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
 
                 # Look for device in this coordinator's data
                 other_stats = other_coordinator.data.get("device_statistics", {})
-                device_data = other_stats.get(self.mac_address) or other_stats.get(self.mac_address.upper())
+                device_data = other_stats.get(self.mac_address) or other_stats.get(
+                    self.mac_address.upper()
+                )
 
                 if device_data and device_data.get("connected"):
                     # Found on another router
@@ -536,7 +549,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         # For combined tracking, set via_device to local AP
         if self._tracking_method == "combined" and self.ap_device != "Unknown AP":
             device_info_dict.update(
-                via_device_kwargs(self.hass, self.via_device, self.coordinator.data_manager.entry.entry_id)
+                via_device_kwargs(
+                    self.hass, self.via_device, self.coordinator.data_manager.entry.entry_id
+                )
             )
 
         return DeviceInfo(**device_info_dict)
@@ -553,7 +568,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
 
         # For combined tracking, only check local coordinator
         device_stats = self.coordinator.data.get("device_statistics", {})
-        device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
+        device_data = device_stats.get(self.mac_address) or device_stats.get(
+            self.mac_address.upper()
+        )
         if device_data:
             return normalize_ap_device_name(device_data.get("ap_device")) or "Unknown AP"
         return "Unknown AP"
@@ -580,7 +597,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
             device_data, _ = self._get_device_data_from_any_coordinator()
         else:
             device_stats = self.coordinator.data.get("device_statistics", {})
-            device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
+            device_data = device_stats.get(self.mac_address) or device_stats.get(
+                self.mac_address.upper()
+            )
 
         # If tracking method is "uniqueid", use simple naming without AP/SSID info
         if self._tracking_method == "uniqueid":
@@ -617,12 +636,19 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         if device_data:
             # Use SSID instead of physical interface name
             ssid = device_data.get("ap_ssid", "Unknown SSID")
-            base_name = f"{connected_router}({ssid})" if ssid != "Unknown SSID" else connected_router
+            base_name = (
+                f"{connected_router}({ssid})" if ssid != "Unknown SSID" else connected_router
+            )
 
             hostname = device_data.get("hostname")
 
             # Show hostname if available and meaningful
-            if hostname and hostname != self.mac_address and hostname != self.mac_address.upper() and hostname != "*":
+            if (
+                hostname
+                and hostname != self.mac_address
+                and hostname != self.mac_address.upper()
+                and hostname != "*"
+            ):
                 # If hostname looks like a domain name, use it directly
                 if "." in hostname:
                     return f"{base_name} {hostname.split('.')[0]}"
@@ -704,7 +730,9 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
             current_router = found_host if found_host else self._host
         else:
             device_stats = self.coordinator.data.get("device_statistics", {})
-            device_data = device_stats.get(self.mac_address) or device_stats.get(self.mac_address.upper())
+            device_data = device_stats.get(self.mac_address) or device_stats.get(
+                self.mac_address.upper()
+            )
             current_router = self._host
 
         attributes = {
@@ -718,7 +746,7 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
             if "ap_device" not in device_data:
                 # If no ap_device, it's likely a wired device
                 connection_type = "wired"
-            
+
             attributes.update(
                 {
                     "name": self._get_device_name(),
@@ -728,7 +756,7 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
                     "ip_address": device_data.get("ip_address", "Unknown IP"),
                 }
             )
-            
+
             # Add wireless-specific attributes
             if connection_type == "wireless":
                 attributes["ap_device"] = device_data.get("ap_device", "Unknown AP")
@@ -759,13 +787,17 @@ class OpenwrtDeviceTracker(CoordinatorEntity, ScannerEntity):
         """Get device data from either device_statistics (WiFi) or wired_devices."""
         # Try WiFi devices first
         device_stats = self.coordinator.data.get("device_statistics", {})
-        device_data = device_stats.get(self._attr_mac_address) or device_stats.get(self._attr_mac_address.upper())
+        device_data = device_stats.get(self._attr_mac_address) or device_stats.get(
+            self._attr_mac_address.upper()
+        )
         if device_data:
             return device_data
-        
+
         # Try wired devices
         wired_devices = self.coordinator.data.get("wired_devices", {})
-        wired_data = wired_devices.get(self._attr_mac_address) or wired_devices.get(self._attr_mac_address.upper())
+        wired_data = wired_devices.get(self._attr_mac_address) or wired_devices.get(
+            self._attr_mac_address.upper()
+        )
         return wired_data
 
     @property

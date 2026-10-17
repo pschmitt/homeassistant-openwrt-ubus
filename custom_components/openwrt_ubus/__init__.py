@@ -8,46 +8,46 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
+    CONF_IP_ADDRESS,
     CONF_PASSWORD,
     CONF_USERNAME,
-    CONF_IP_ADDRESS,
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
-from .Ubus.const import API_DEF_TIMEOUT
 from .const import (
     CONF_DHCP_SOFTWARE,
-    CONF_WIRELESS_SOFTWARE,
-    CONF_USE_HTTPS,
-    CONF_PORT,
-    CONF_ENDPOINT,
-    CONF_ENABLE_QMODEM_SENSORS,
-    CONF_ENABLE_STA_SENSORS,
-    CONF_ENABLE_SYSTEM_SENSORS,
     CONF_ENABLE_AP_SENSORS,
     CONF_ENABLE_ETH_SENSORS,
     CONF_ENABLE_MWAN3_SENSORS,
     CONF_ENABLE_NLBWMON_SENSORS,
-    CONF_ENABLE_SSID_SWITCHES,
+    CONF_ENABLE_QMODEM_SENSORS,
     CONF_ENABLE_SERVICE_CONTROLS,
+    CONF_ENABLE_SSID_SWITCHES,
+    CONF_ENABLE_STA_SENSORS,
+    CONF_ENABLE_SYSTEM_SENSORS,
+    CONF_ENDPOINT,
+    CONF_PORT,
     CONF_SELECTED_SERVICES,
+    CONF_USE_HTTPS,
+    CONF_WIRELESS_SOFTWARE,
     DEFAULT_DHCP_SOFTWARE,
-    DEFAULT_WIRELESS_SOFTWARE,
-    DEFAULT_ENABLE_QMODEM_SENSORS,
-    DEFAULT_ENABLE_STA_SENSORS,
-    DEFAULT_ENABLE_SYSTEM_SENSORS,
     DEFAULT_ENABLE_AP_SENSORS,
     DEFAULT_ENABLE_ETH_SENSORS,
     DEFAULT_ENABLE_MWAN3_SENSORS,
+    DEFAULT_ENABLE_QMODEM_SENSORS,
     DEFAULT_ENABLE_SERVICE_CONTROLS,
+    DEFAULT_ENABLE_STA_SENSORS,
+    DEFAULT_ENABLE_SYSTEM_SENSORS,
+    DEFAULT_ENDPOINT,
     DEFAULT_SELECTED_SERVICES,
     DEFAULT_USE_HTTPS,
-    DEFAULT_ENDPOINT,
+    DEFAULT_WIRELESS_SOFTWARE,
     DHCP_SOFTWARES,
     DOMAIN,
     PLATFORMS,
@@ -56,6 +56,7 @@ from .const import (
 )
 from .extended_ubus import ExtendedUbus
 from .shared_data_manager import SharedUbusDataManager
+from .Ubus.const import API_DEF_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,8 +69,12 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_VERIFY_SSL, default=False): cv.boolean,
                 vol.Required(CONF_USERNAME): cv.string,
                 vol.Required(CONF_PASSWORD): cv.string,
-                vol.Optional(CONF_WIRELESS_SOFTWARE, default=DEFAULT_WIRELESS_SOFTWARE): vol.In(WIRELESS_SOFTWARES),
-                vol.Optional(CONF_DHCP_SOFTWARE, default=DEFAULT_DHCP_SOFTWARE): vol.In(DHCP_SOFTWARES),
+                vol.Optional(CONF_WIRELESS_SOFTWARE, default=DEFAULT_WIRELESS_SOFTWARE): vol.In(
+                    WIRELESS_SOFTWARES
+                ),
+                vol.Optional(CONF_DHCP_SOFTWARE, default=DEFAULT_DHCP_SOFTWARE): vol.In(
+                    DHCP_SOFTWARES
+                ),
             }
         )
     },
@@ -113,7 +118,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.config_entries.async_update_entry(entry, data=new_data)
         entry = hass.config_entries.async_get_entry(entry.entry_id)
         if entry is None:
-            raise ConfigEntryNotReady("Failed to reload config entry data for SSID switch migration")
+            raise ConfigEntryNotReady(
+                "Failed to reload config entry data for SSID switch migration"
+            )
 
     # Test connection before setting up platforms
     hostname = entry.data[CONF_HOST]
@@ -264,7 +271,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 if services_to_restart:
                     # Handle both string and list inputs
                     service_list = (
-                        services_to_restart if isinstance(services_to_restart, list) else [services_to_restart]
+                        services_to_restart
+                        if isinstance(services_to_restart, list)
+                        else [services_to_restart]
                     )
                     for service_name in service_list:
                         try:
@@ -296,7 +305,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
 
     except Exception as exc:
-        raise ConfigEntryNotReady(f"Failed to connect to OpenWrt device at {hostname}: {exc}") from exc
+        raise ConfigEntryNotReady(
+            f"Failed to connect to OpenWrt device at {hostname}: {exc}"
+        ) from exc
 
     # Store the config entry data as a mutable dict
     hass.data[DOMAIN][f"entry_data_{entry.entry_id}"] = dict(entry.data)
@@ -389,7 +400,9 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         # only remove the QModem device
         if not qmodem_enabled:
             qmodem_identifier = (DOMAIN, f"{host}_qmodem")
-            qmodem_device = device_registry.async_get_device_by_identifier(qmodem_identifier, entry.entry_id)
+            qmodem_device = device_registry.async_get_device_by_identifier(
+                qmodem_identifier, entry.entry_id
+            )
             if qmodem_device:
                 _LOGGER.info(
                     "Removing QModem device %s (QModem sensors disabled)",
@@ -408,7 +421,9 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         if not sta_enabled:
             removed_count = 0
             # Find all devices that have via_device pointing to the main router
-            for device in list(device_registry.devices):  # Use list() to avoid modification during iteration
+            for device in list(
+                device_registry.devices
+            ):  # Use list() to avoid modification during iteration
                 if device.via_device_id:
                     via_device = device_registry.async_get(device.via_device_id)
                     if via_device and (DOMAIN, host) in via_device.identifiers:
@@ -440,11 +455,15 @@ async def _cleanup_disabled_sensor_devices(hass: HomeAssistant, entry: ConfigEnt
         for name, enabled, main_id in sensors:
             if enabled:
                 continue
-            main_device = device_registry.async_get_device_by_identifier((DOMAIN, main_id), entry.entry_id)
+            main_device = device_registry.async_get_device_by_identifier(
+                (DOMAIN, main_id), entry.entry_id
+            )
             if not main_device:
                 continue
             removed_count = 0
-            for device in list(device_registry.devices):  # Use list() to avoid modification during iteration
+            for device in list(
+                device_registry.devices
+            ):  # Use list() to avoid modification during iteration
                 if device.via_device_id == main_device.id:
                     device_registry.async_remove_device(device.id)
                     removed_count += 1
@@ -492,7 +511,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-async def async_remove_config_entry_device(_: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry) -> bool:
+async def async_remove_config_entry_device(
+    _: HomeAssistant, entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
     """Handle device removal."""
     host = entry.data[CONF_HOST]
     for identifier in device_entry.identifiers:

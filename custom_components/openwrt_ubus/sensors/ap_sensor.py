@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -16,24 +17,25 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
-    UnitOfFrequency,
-    UnitOfDataRate,
     PERCENTAGE,
+    UnitOfDataRate,
+    UnitOfFrequency,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from ..device_helpers import via_device_kwargs
 from ..const import (
-    DOMAIN,
     CONF_AP_SENSOR_TIMEOUT,
     DEFAULT_AP_SENSOR_TIMEOUT,
+    DOMAIN,
 )
+from ..device_helpers import via_device_kwargs
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -330,7 +332,10 @@ async def async_setup_entry(
                 # Only add sensors that don't already exist and have data
                 if device_sensors_to_add:
                     new_entities.extend(
-                        [ApSensor(coordinator, description, ap_device) for description in device_sensors_to_add]
+                        [
+                            ApSensor(coordinator, description, ap_device)
+                            for description in device_sensors_to_add
+                        ]
                     )
 
                 coordinator.known_devices.add(ap_device)
@@ -383,7 +388,9 @@ async def async_setup_entry(
         try:
             await coordinator.async_config_entry_first_refresh()
         except Exception as exc:
-            _LOGGER.warning("Initial AP sensor data fetch failed, will retry automatically: %s", exc)
+            _LOGGER.warning(
+                "Initial AP sensor data fetch failed, will retry automatically: %s", exc
+            )
 
     entry.async_create_background_task(
         hass, _refresh_ap_devices(), "openwrt_ubus_refresh_ap_devices"
@@ -431,7 +438,9 @@ class ApSensor(CoordinatorEntity, SensorEntity):
             name=device_name,
             manufacturer="OpenWrt",
             model="Access Point",
-            **via_device_kwargs(self.hass, f"{self._host}_ap", self.coordinator.data_manager.entry.entry_id),
+            **via_device_kwargs(
+                self.hass, f"{self._host}_ap", self.coordinator.data_manager.entry.entry_id
+            ),
         )
 
     @property
@@ -476,7 +485,7 @@ class ApSensor(CoordinatorEntity, SensorEntity):
                 ap_dev = info.get("ap_device", "")
                 if ap_dev.startswith("hostapd."):
                     ap_dev = ap_dev.replace("hostapd.", "", 1)
-                
+
                 if ap_dev == self.ap_device:
                     count += 1
             return count
@@ -600,7 +609,7 @@ class TotalWirelessClientsSensor(CoordinatorEntity, SensorEntity):
                 continue
             # Normalise hostapd.<ifname> -> <ifname>
             if ap_dev.startswith("hostapd."):
-                ap_dev = ap_dev[len("hostapd."):]
+                ap_dev = ap_dev[len("hostapd.") :]
             per_ap[ap_dev] = per_ap.get(ap_dev, 0) + 1
 
         return {"clients_per_ap": per_ap, "router_host": self._host}

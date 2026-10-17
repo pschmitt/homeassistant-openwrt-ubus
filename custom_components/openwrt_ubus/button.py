@@ -8,16 +8,16 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .buttons import device_kick_button, reboot_button, service_button
 from .const import (
-    DOMAIN,
-    CONF_ENABLE_SERVICE_CONTROLS,
     CONF_ENABLE_DEVICE_KICK_BUTTONS,
     CONF_ENABLE_REBOOT_BUTTON,
-    DEFAULT_ENABLE_SERVICE_CONTROLS,
+    CONF_ENABLE_SERVICE_CONTROLS,
     DEFAULT_ENABLE_DEVICE_KICK_BUTTONS,
     DEFAULT_ENABLE_REBOOT_BUTTON,
+    DEFAULT_ENABLE_SERVICE_CONTROLS,
+    DOMAIN,
 )
-from .buttons import service_button, device_kick_button, reboot_button
 
 _LOGGER = logging.getLogger(__name__)
 

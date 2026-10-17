@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -13,27 +13,26 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTime, CONF_HOST
+from homeassistant.const import CONF_HOST, UnitOfTime
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from ..device_helpers import via_device_kwargs
 from ..const import (
-    DOMAIN,
-    CONF_USE_HTTPS,
-    CONF_PORT,
-    DEFAULT_USE_HTTPS,
     CONF_MWAN3_SENSOR_TIMEOUT,
+    CONF_PORT,
+    CONF_USE_HTTPS,
     DEFAULT_MWAN3_SENSOR_TIMEOUT,
+    DEFAULT_USE_HTTPS,
+    DOMAIN,
     build_configuration_url,
 )
+from ..device_helpers import via_device_kwargs
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -256,7 +255,10 @@ async def async_setup_entry(
                 # Add all policy sensors
                 if policy_sensors_to_add:
                     new_policy_entities.extend(
-                        [MWAN3PolicySensor(coordinator, description, policy) for description in policy_sensors_to_add]
+                        [
+                            MWAN3PolicySensor(coordinator, description, policy)
+                            for description in policy_sensors_to_add
+                        ]
                     )
 
                 coordinator.known_policies.add(policy)
@@ -297,9 +299,7 @@ async def async_setup_entry(
 
         _LOGGER.info("MWAN3 coordinator and global entities created - mwan3 is available")
 
-    entry.async_create_background_task(
-        hass, _refresh_mwan3(), "openwrt_ubus_refresh_mwan3"
-    )
+    entry.async_create_background_task(hass, _refresh_mwan3(), "openwrt_ubus_refresh_mwan3")
     return coordinator
 
 
@@ -335,7 +335,9 @@ class MWAN3InterfaceSensor(CoordinatorEntity, SensorEntity):
                 self.coordinator.data_manager.entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS),
                 self.coordinator.data_manager.entry.data.get(CONF_PORT),
             ),
-            **via_device_kwargs(self.hass, f"{self._host}_mwan3", self.coordinator.data_manager.entry.entry_id),
+            **via_device_kwargs(
+                self.hass, f"{self._host}_mwan3", self.coordinator.data_manager.entry.entry_id
+            ),
         )
 
     @property
@@ -360,7 +362,9 @@ class MWAN3InterfaceSensor(CoordinatorEntity, SensorEntity):
 
         # Parse the MWAN3 data and extract the requested value for this interface
         try:
-            return self._extract_interface_value(mwan3_status, self._interface, self.entity_description.key)
+            return self._extract_interface_value(
+                mwan3_status, self._interface, self.entity_description.key
+            )
         except Exception as exc:
             _LOGGER.warning(
                 "Error extracting MWAN3 value for interface %s, key %s: %s",
@@ -423,20 +427,28 @@ class MWAN3InterfaceSensor(CoordinatorEntity, SensorEntity):
         if key == "track_ips_up":
             track_ips = interface_data.get("track_ip", [])
             if isinstance(track_ips, list):
-                return sum(1 for ip_entry in track_ips if isinstance(ip_entry, dict) and ip_entry.get("status") == "up")
+                return sum(
+                    1
+                    for ip_entry in track_ips
+                    if isinstance(ip_entry, dict) and ip_entry.get("status") == "up"
+                )
             return 0
         if key == "track_ips_skipped":
             track_ips = interface_data.get("track_ip", [])
             if isinstance(track_ips, list):
                 return sum(
-                    1 for ip_entry in track_ips if isinstance(ip_entry, dict) and ip_entry.get("status") == "skipped"
+                    1
+                    for ip_entry in track_ips
+                    if isinstance(ip_entry, dict) and ip_entry.get("status") == "skipped"
                 )
             return 0
         if key == "track_ips_down":
             track_ips = interface_data.get("track_ip", [])
             if isinstance(track_ips, list):
                 return sum(
-                    1 for ip_entry in track_ips if isinstance(ip_entry, dict) and ip_entry.get("status") == "down"
+                    1
+                    for ip_entry in track_ips
+                    if isinstance(ip_entry, dict) and ip_entry.get("status") == "down"
                 )
             return 0
 
@@ -491,7 +503,9 @@ class MWAN3PolicySensor(CoordinatorEntity, SensorEntity):
                 self.coordinator.data_manager.entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS),
                 self.coordinator.data_manager.entry.data.get(CONF_PORT),
             ),
-            **via_device_kwargs(self.hass, f"{self._host}_mwan3", self.coordinator.data_manager.entry.entry_id),
+            **via_device_kwargs(
+                self.hass, f"{self._host}_mwan3", self.coordinator.data_manager.entry.entry_id
+            ),
         )
 
     @property
@@ -516,7 +530,9 @@ class MWAN3PolicySensor(CoordinatorEntity, SensorEntity):
 
         # Parse the MWAN3 data and extract the requested value for this policy
         try:
-            return self._extract_policy_value(mwan3_status, self._policy, self.entity_description.key)
+            return self._extract_policy_value(
+                mwan3_status, self._policy, self.entity_description.key
+            )
         except Exception as exc:
             _LOGGER.warning(
                 "Error extracting MWAN3 value for policy %s, key %s: %s",
@@ -572,7 +588,8 @@ class MWAN3PolicySensor(CoordinatorEntity, SensorEntity):
                 reverse=True,
             )
             return ", ".join(
-                f"{iface.get('interface', 'unknown')} ({iface.get('percent', 0)}%)" for iface in sorted_interfaces
+                f"{iface.get('interface', 'unknown')} ({iface.get('percent', 0)}%)"
+                for iface in sorted_interfaces
             )
 
         # If key is not recognized, return empty string

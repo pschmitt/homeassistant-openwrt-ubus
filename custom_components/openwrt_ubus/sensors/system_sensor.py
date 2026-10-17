@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
-import re
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -20,8 +19,8 @@ from homeassistant.const import (
     CONF_USERNAME,
     PERCENTAGE,
     UnitOfInformation,
-    UnitOfTime,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,20 +29,19 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
-    UpdateFailed,
 )
 
 from ..const import (
-    DOMAIN,
-    CONF_USE_HTTPS,
-    CONF_PORT,
     CONF_ENDPOINT,
-    DEFAULT_USE_HTTPS,
-    DEFAULT_ENDPOINT,
+    CONF_PORT,
     CONF_SYSTEM_SENSOR_TIMEOUT,
+    CONF_USE_HTTPS,
+    DEFAULT_ENDPOINT,
     DEFAULT_SYSTEM_SENSOR_TIMEOUT,
-    build_ubus_url,
+    DEFAULT_USE_HTTPS,
+    DOMAIN,
     build_configuration_url,
+    build_ubus_url,
 )
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
@@ -290,11 +288,11 @@ async def async_setup_entry(
         try:
             await coordinator.async_config_entry_first_refresh()
         except Exception as exc:
-            _LOGGER.warning("Initial system sensor data fetch failed, will retry automatically: %s", exc)
+            _LOGGER.warning(
+                "Initial system sensor data fetch failed, will retry automatically: %s", exc
+            )
 
-    entry.async_create_background_task(
-        hass, _refresh_system(), "openwrt_ubus_refresh_system"
-    )
+    entry.async_create_background_task(hass, _refresh_system(), "openwrt_ubus_refresh_system")
 
     return coordinator
 
@@ -345,12 +343,20 @@ class SystemInfoSensor(CoordinatorEntity, SensorEntity):
         """Return device info for the router."""
         # Try to get board info from coordinator data
         board_model = (
-            self.coordinator.data.get("system_board", {}).get("model", "Router") if self.coordinator.data else "Router"
+            self.coordinator.data.get("system_board", {}).get("model", "Router")
+            if self.coordinator.data
+            else "Router"
         )
         board_hostname = (
-            self.coordinator.data.get("system_board", {}).get("hostname") if self.coordinator.data else None
+            self.coordinator.data.get("system_board", {}).get("hostname")
+            if self.coordinator.data
+            else None
         )
-        board_system = self.coordinator.data.get("system_board", {}).get("system") if self.coordinator.data else None
+        board_system = (
+            self.coordinator.data.get("system_board", {}).get("system")
+            if self.coordinator.data
+            else None
+        )
 
         # Use hostname for name if available, otherwise use host
         device_name = board_hostname or f"OpenWrt Router ({self._host})"
@@ -408,20 +414,38 @@ class SystemInfoSensor(CoordinatorEntity, SensorEntity):
             else:
                 cpu_idle_delta = cpu_idle - self.cpu_idle
                 cpu_total_delta = cpu_total - self.cpu_total
-                cpu_usage = round((1.0 - cpu_idle_delta / cpu_total_delta) * 100) if cpu_total_delta > 0 else None
+                cpu_usage = (
+                    round((1.0 - cpu_idle_delta / cpu_total_delta) * 100)
+                    if cpu_total_delta > 0
+                    else None
+                )
             self.cpu_total = cpu_total
             self.cpu_idle = cpu_idle
             return cpu_usage
         elif key.startswith("memory_"):
             memory = system_info.get("memory", {})
             if key == "memory_total":
-                return round(memory.get("total", 0) / (1024 * 1024), 1) if memory.get("total") else None
+                return (
+                    round(memory.get("total", 0) / (1024 * 1024), 1)
+                    if memory.get("total")
+                    else None
+                )
             elif key == "memory_free":
-                return round(memory.get("free", 0) / (1024 * 1024), 1) if memory.get("free") else None
+                return (
+                    round(memory.get("free", 0) / (1024 * 1024), 1) if memory.get("free") else None
+                )
             elif key == "memory_buffered":
-                return round(memory.get("buffered", 0) / (1024 * 1024), 1) if memory.get("buffered") else None
+                return (
+                    round(memory.get("buffered", 0) / (1024 * 1024), 1)
+                    if memory.get("buffered")
+                    else None
+                )
             elif key == "memory_shared":
-                return round(memory.get("shared", 0) / (1024 * 1024), 1) if memory.get("shared") else None
+                return (
+                    round(memory.get("shared", 0) / (1024 * 1024), 1)
+                    if memory.get("shared")
+                    else None
+                )
             elif key == "memory_usage_percent":
                 total = memory.get("total", 0)
                 free = memory.get("free", 0)

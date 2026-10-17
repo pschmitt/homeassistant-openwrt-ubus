@@ -13,8 +13,8 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from ..const import (
-    CONF_SELECTED_SERVICES,
     CONF_ENABLE_SERVICE_CONTROLS,
+    CONF_SELECTED_SERVICES,
     DOMAIN,
 )
 

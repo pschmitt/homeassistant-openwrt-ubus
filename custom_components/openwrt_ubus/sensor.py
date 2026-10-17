@@ -9,30 +9,30 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    DOMAIN,
-    CONF_ENABLE_QMODEM_SENSORS,
-    CONF_ENABLE_STA_SENSORS,
-    CONF_ENABLE_SYSTEM_SENSORS,
     CONF_ENABLE_AP_SENSORS,
     CONF_ENABLE_ETH_SENSORS,
     CONF_ENABLE_NLBWMON_SENSORS,
-    DEFAULT_ENABLE_QMODEM_SENSORS,
-    DEFAULT_ENABLE_STA_SENSORS,
-    DEFAULT_ENABLE_SYSTEM_SENSORS,
+    CONF_ENABLE_QMODEM_SENSORS,
+    CONF_ENABLE_STA_SENSORS,
+    CONF_ENABLE_SYSTEM_SENSORS,
     DEFAULT_ENABLE_AP_SENSORS,
     DEFAULT_ENABLE_ETH_SENSORS,
     DEFAULT_ENABLE_MWAN3_SENSORS,
     DEFAULT_ENABLE_NLBWMON_SENSORS,
+    DEFAULT_ENABLE_QMODEM_SENSORS,
+    DEFAULT_ENABLE_STA_SENSORS,
+    DEFAULT_ENABLE_SYSTEM_SENSORS,
+    DOMAIN,
 )
 from .sensors import (
-    system_sensor,
-    qmodem_sensor,
-    sta_sensor,
     ap_sensor,
     eth_sensor,
+    extras_sensor,
     mwan3_sensor,
     nlbwmon_sensor,
-    extras_sensor,
+    qmodem_sensor,
+    sta_sensor,
+    system_sensor,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,7 +128,9 @@ async def async_setup_entry(
                 except Exception as exc:
                     # If the error is from the eth_sensor module, log with eth_sensor logger
                     if module_name == "eth_sensor":
-                        eth_logger = logging.getLogger("custom_components.openwrt_ubus.sensors.eth_sensor")
+                        eth_logger = logging.getLogger(
+                            "custom_components.openwrt_ubus.sensors.eth_sensor"
+                        )
                         eth_logger.error("Error accessing coordinator for eth_sensor: %s", exc)
                         eth_logger.error("eth_sensor module entry data: %s", entry.data)
                         eth_logger.error("eth_sensor module entry options: %s", entry.options)

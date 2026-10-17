@@ -4,41 +4,41 @@ import json
 import logging
 import time
 
-from .Ubus import Ubus
-from .Ubus.interface import PreparedCall
 from .const import (
+    API_METHOD_BOARD,
+    API_METHOD_COMMIT,
+    API_METHOD_DEL_CLIENT,
     API_METHOD_EXEC,
-    API_RPC_CALL,
-    API_RPC_LIST,
+    API_METHOD_GET,
+    API_METHOD_GET_AP,
+    API_METHOD_GET_CLIENTS,
+    API_METHOD_GET_MWAN3,
+    API_METHOD_GET_QMODEM,
+    API_METHOD_GET_STA,
+    API_METHOD_INFO,
+    API_METHOD_INIT,
+    API_METHOD_LIST,
+    API_METHOD_READ,
+    API_METHOD_REBOOT,
+    API_METHOD_SET,
     API_PARAM_CONFIG,
     API_PARAM_PATH,
     API_PARAM_TYPE,
+    API_RPC_CALL,
+    API_RPC_LIST,
     API_SUBSYS_DHCP,
     API_SUBSYS_FILE,
     API_SUBSYS_HOSTAPD,
     API_SUBSYS_IWINFO,
+    API_SUBSYS_MWAN3,
+    API_SUBSYS_QMODEM,
+    API_SUBSYS_RC,
     API_SUBSYS_SYSTEM,
     API_SUBSYS_UCI,
-    API_SUBSYS_QMODEM,
-    API_SUBSYS_MWAN3,
-    API_SUBSYS_RC,
     API_SUBSYS_WIRELESS,
-    API_METHOD_BOARD,
-    API_METHOD_GET,
-    API_METHOD_GET_AP,
-    API_METHOD_GET_CLIENTS,
-    API_METHOD_GET_STA,
-    API_METHOD_GET_QMODEM,
-    API_METHOD_GET_MWAN3,
-    API_METHOD_INFO,
-    API_METHOD_READ,
-    API_METHOD_DEL_CLIENT,
-    API_METHOD_LIST,
-    API_METHOD_INIT,
-    API_METHOD_REBOOT,
-    API_METHOD_SET,
-    API_METHOD_COMMIT,
 )
+from .Ubus import Ubus
+from .Ubus.interface import PreparedCall
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,7 +90,9 @@ class ExtendedUbus(Ubus):
         if not mapping:
             try:
                 ap_result = await self.api_call(API_RPC_CALL, API_SUBSYS_IWINFO, API_METHOD_GET_AP)
-                ap_devices = list(ap_result.get("devices", [])) if isinstance(ap_result, dict) else []
+                ap_devices = (
+                    list(ap_result.get("devices", [])) if isinstance(ap_result, dict) else []
+                )
                 for ifname in ap_devices:
                     try:
                         info = await self.api_call(
@@ -118,7 +120,6 @@ class ExtendedUbus(Ubus):
 
         return mapping
 
-
     async def file_read(self, path):
         """Read file content."""
         return await self.api_call(
@@ -127,7 +128,7 @@ class ExtendedUbus(Ubus):
             API_METHOD_READ,
             {API_PARAM_PATH: path},
         )
-    
+
     async def file_exec(self, command, params=None):
         """Execute a command through ubus file.exec."""
         return await self.api_call(
@@ -206,7 +207,9 @@ class ExtendedUbus(Ubus):
             for name, led_config in led_sections.items():
                 trigger_result = await self.file_read(f"/sys/class/leds/{name}/trigger")
                 brightness_result = await self.file_read(f"/sys/class/leds/{name}/brightness")
-                max_brightness_result = await self.file_read(f"/sys/class/leds/{name}/max_brightness")
+                max_brightness_result = await self.file_read(
+                    f"/sys/class/leds/{name}/max_brightness"
+                )
 
                 trigger_text = self._get_file_data(trigger_result).strip()
                 brightness_text = self._get_file_data(brightness_result).strip()
@@ -230,7 +233,9 @@ class ExtendedUbus(Ubus):
                     "supports_effects": len(triggers) > 1,
                     "configured_trigger": led_config.get("configured_trigger", "none"),
                     "configured_default": configured_default,
-                    "is_on": current_trigger != "none" or brightness_value > 0 or configured_default not in {"0", "false", "False"},
+                    "is_on": current_trigger != "none"
+                    or brightness_value > 0
+                    or configured_default not in {"0", "false", "False"},
                 }
 
             return leds
@@ -334,7 +339,7 @@ class ExtendedUbus(Ubus):
             _LOGGER.debug("Loading sensor module: eth_sensor")
             # Simulate error accessing coordinator
             raise KeyError(eth_sensor_id)
-        except KeyError as exc:
+        except KeyError:
             _LOGGER.error("Error accessing coordinator for eth_sensor: '%s'", eth_sensor_id)
             _LOGGER.debug("Sensor module eth_sensor returned no coordinator")
             return None
@@ -551,7 +556,9 @@ class ExtendedUbus(Ubus):
             },
         )
 
-    async def uci_get_option(self, config: str, section: str | None = None, option: str | None = None):
+    async def uci_get_option(
+        self, config: str, section: str | None = None, option: str | None = None
+    ):
         """Get a specific UCI option value."""
         params: dict = {API_PARAM_CONFIG: config}
         if section is not None:
@@ -656,8 +663,6 @@ class ExtendedUbus(Ubus):
     async def system_stat(self):
         """Kernel system statistics."""
         return await self.file_read("/proc/stat")
-    
-
 
     async def system_reboot(self):
         """Trigger a system reboot."""
@@ -700,7 +705,9 @@ class ExtendedUbus(Ubus):
         if isinstance(result, list):
             # Direct list format - normalize MAC addresses to uppercase
             sta_devices.extend(
-                device["mac"].upper() for device in result if isinstance(device, dict) and "mac" in device
+                device["mac"].upper()
+                for device in result
+                if isinstance(device, dict) and "mac" in device
             )
         elif isinstance(result, dict):
             # Dictionary format with "results" key - normalize MAC addresses to uppercase
@@ -950,7 +957,9 @@ class ExtendedUbus(Ubus):
                             )
 
                             # Parse service status - OpenWrt RC returns different formats
-                            parsed_status = self._parse_service_status(service_status, service_name, procd_services)
+                            parsed_status = self._parse_service_status(
+                                service_status, service_name, procd_services
+                            )
                             services_with_status[service_name] = parsed_status
                         else:
                             _LOGGER.debug(
@@ -1018,7 +1027,7 @@ class ExtendedUbus(Ubus):
             if procd_services and not running:
                 if service_name in procd_services:
                     service_procd = procd_services[service_name]
-                    
+
                     if "instances" in service_procd:
                         # Standard service with daemon processes
                         instances = service_procd["instances"]
@@ -1027,7 +1036,7 @@ class ExtendedUbus(Ubus):
                                 running = True
                                 break
                     else:
-                        # Non-daemon service registered as active in procd 
+                        # Non-daemon service registered as active in procd
                         # (e.g., adblock-fast with custom 'data', or qosmate with empty dict)
                         running = True
 
@@ -1152,10 +1161,7 @@ class ExtendedUbus(Ubus):
         Returns:
             dict: Dictionary with 'ipv4' and 'ipv6' neighbor entries, or error indicator
         """
-        result = {
-            "ipv4": [],
-            "ipv6": []
-        }
+        result = {"ipv4": [], "ipv6": []}
 
         try:
             # Execute /sbin/ip -4 neigh show (IPv4)
@@ -1164,10 +1170,7 @@ class ExtendedUbus(Ubus):
                     API_RPC_CALL,
                     "file",
                     "exec",
-                    {
-                        "command": "/sbin/ip",
-                        "params": ["-4", "neigh", "show"]
-                    }
+                    {"command": "/sbin/ip", "params": ["-4", "neigh", "show"]},
                 )
                 if ipv4_result and "stdout" in ipv4_result:
                     result["ipv4"] = self._parse_ip_neigh_output(ipv4_result["stdout"], "ipv4")
@@ -1177,7 +1180,7 @@ class ExtendedUbus(Ubus):
                     "To enable wired device tracking, configure ubus ACL to allow: "
                     '"/sbin/ip -[46] neigh show" in file.exec permissions. '
                     "Session ID: %s",
-                    self.session_id or "None"
+                    self.session_id or "None",
                 )
                 _LOGGER.debug("Permission error details: %s", exc)
                 return {"error": "permission_denied"}
@@ -1190,10 +1193,7 @@ class ExtendedUbus(Ubus):
                     API_RPC_CALL,
                     "file",
                     "exec",
-                    {
-                        "command": "/sbin/ip",
-                        "params": ["-6", "neigh", "show"]
-                    }
+                    {"command": "/sbin/ip", "params": ["-6", "neigh", "show"]},
                 )
                 if ipv6_result and "stdout" in ipv6_result:
                     result["ipv6"] = self._parse_ip_neigh_output(ipv6_result["stdout"], "ipv6")
@@ -1203,17 +1203,21 @@ class ExtendedUbus(Ubus):
                     "To enable wired device tracking, configure ubus ACL to allow: "
                     '"/sbin/ip -[46] neigh show" in file.exec permissions. '
                     "Session ID: %s",
-                    self.session_id or "None"
+                    self.session_id or "None",
                 )
                 _LOGGER.debug("Permission error details: %s", exc)
                 return {"error": "permission_denied"}
             except Exception as exc:
                 _LOGGER.debug("IPv6 neighbor query error: %s", exc)
 
-            _LOGGER.debug("Found %d IPv4 and %d IPv6 neighbors", len(result["ipv4"]), len(result["ipv6"]))
+            _LOGGER.debug(
+                "Found %d IPv4 and %d IPv6 neighbors", len(result["ipv4"]), len(result["ipv6"])
+            )
 
         except Exception as exc:
-            _LOGGER.error("Error getting IP neighbors, Session ID: %s - %s", self.session_id or "None", exc)
+            _LOGGER.error(
+                "Error getting IP neighbors, Session ID: %s - %s", self.session_id or "None", exc
+            )
 
         return result
 
@@ -1245,7 +1249,7 @@ class ExtendedUbus(Ubus):
                     "interface": None,
                     "mac": None,
                     "state": None,
-                    "ip_version": ip_version
+                    "ip_version": ip_version,
                 }
 
                 # Parse the line: IP dev INTERFACE lladdr MAC STATE
@@ -1254,7 +1258,15 @@ class ExtendedUbus(Ubus):
                         entry["interface"] = parts[i + 1]
                     elif part == "lladdr" and i + 1 < len(parts):
                         entry["mac"] = parts[i + 1].upper()
-                    elif part in ["REACHABLE", "STALE", "DELAY", "PROBE", "FAILED", "PERMANENT", "NOARP"]:
+                    elif part in [
+                        "REACHABLE",
+                        "STALE",
+                        "DELAY",
+                        "PROBE",
+                        "FAILED",
+                        "PERMANENT",
+                        "NOARP",
+                    ]:
                         entry["state"] = part
 
                 # Only add entries with a MAC address

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -15,7 +16,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, UnitOfTime, UnitOfInformation, UnitOfDataRate
+from homeassistant.const import CONF_HOST, UnitOfDataRate, UnitOfInformation, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -24,15 +25,15 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from ..device_helpers import via_device_kwargs
 from ..const import (
-    DOMAIN,
     CONF_STA_SENSOR_TIMEOUT,
-    DEFAULT_STA_SENSOR_TIMEOUT,
     CONF_TRACKING_METHOD,
+    DEFAULT_STA_SENSOR_TIMEOUT,
     DEFAULT_TRACKING_METHOD,
+    DOMAIN,
     normalize_ap_device_name,
 )
+from ..device_helpers import via_device_kwargs
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -526,7 +527,9 @@ async def async_setup_entry(
         try:
             await coordinator.async_config_entry_first_refresh()
         except Exception as exc:
-            _LOGGER.warning("Initial STA sensor data fetch failed, will retry automatically: %s", exc)
+            _LOGGER.warning(
+                "Initial STA sensor data fetch failed, will retry automatically: %s", exc
+            )
 
     entry.async_create_background_task(
         hass, _refresh_sta_devices(), "openwrt_ubus_refresh_sta_devices"
@@ -570,7 +573,9 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
     def _device_data(self) -> dict[str, Any] | None:
         """Get device data, searching all coordinators for uniqueid tracking."""
         device_stats = self.coordinator.data.get("device_statistics", {})
-        device_data = device_stats.get(self._mac_address) or device_stats.get(self._mac_address.upper())
+        device_data = device_stats.get(self._mac_address) or device_stats.get(
+            self._mac_address.upper()
+        )
 
         # For combined tracking or if found locally, return immediately
         if self._tracking_method == "combined" or device_data:
@@ -592,7 +597,9 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
 
                 # Look for device in this coordinator's data
                 other_stats = other_coordinator.data.get("device_statistics", {})
-                device_data = other_stats.get(self._mac_address) or other_stats.get(self._mac_address.upper())
+                device_data = other_stats.get(self._mac_address) or other_stats.get(
+                    self._mac_address.upper()
+                )
 
                 if device_data:
                     return device_data
@@ -606,7 +613,9 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
             Tuple of (device_data, host) where device was found, or (None, None) if not found.
         """
         device_stats = self.coordinator.data.get("device_statistics", {})
-        device_data = device_stats.get(self._mac_address) or device_stats.get(self._mac_address.upper())
+        device_data = device_stats.get(self._mac_address) or device_stats.get(
+            self._mac_address.upper()
+        )
 
         # For combined tracking or if found locally, return immediately
         if self._tracking_method == "combined" or device_data:
@@ -628,7 +637,9 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
 
                 # Look for device in this coordinator's data
                 other_stats = other_coordinator.data.get("device_statistics", {})
-                device_data = other_stats.get(self._mac_address) or other_stats.get(self._mac_address.upper())
+                device_data = other_stats.get(self._mac_address) or other_stats.get(
+                    self._mac_address.upper()
+                )
 
                 if device_data:
                     other_host = other_coordinator.data_manager.entry.data[CONF_HOST]
@@ -652,7 +663,11 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
         # For combined tracking, set via_device to local AP
         if self._tracking_method == "combined" and ap_device != "Unknown AP":
             device_info_dict.update(
-                via_device_kwargs(self.hass, f"{self._host}_ap_{ap_device}", self.coordinator.data_manager.entry.entry_id)
+                via_device_kwargs(
+                    self.hass,
+                    f"{self._host}_ap_{ap_device}",
+                    self.coordinator.data_manager.entry.entry_id,
+                )
             )
 
         return DeviceInfo(**device_info_dict)
@@ -663,7 +678,12 @@ class DeviceStatisticsSensor(CoordinatorEntity, SensorEntity):
             hostname = device_data.get("hostname")
 
             # Show hostname if available and meaningful
-            if hostname and hostname != self._mac_address and hostname != self._mac_address.upper() and hostname != "*":
+            if (
+                hostname
+                and hostname != self._mac_address
+                and hostname != self._mac_address.upper()
+                and hostname != "*"
+            ):
                 # If hostname looks like a domain name, use it directly
                 if "." in hostname:
                     return hostname.split(".")[0]

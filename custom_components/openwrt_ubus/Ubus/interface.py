@@ -1,4 +1,5 @@
 """Client for the OpenWrt ubus API."""
+
 import asyncio
 import json
 import logging
@@ -10,24 +11,22 @@ import aiohttp
 from .const import (
     API_DEF_DEBUG,
     API_DEF_SESSION_ID,
-    API_DEF_TIMEOUT,
-    API_DEF_VERIFY,
     API_ERROR,
     API_MESSAGE,
-    API_SESSION_METHOD_LOGIN,
     API_PARAM_PASSWORD,
     API_PARAM_USERNAME,
     API_RESULT,
     API_RPC_CALL,
     API_RPC_VERSION,
-    API_SUBSYS_SESSION,
-    API_UBUS_RPC_SESSION,
-    HTTP_STATUS_OK,
-    UBUS_ERROR_SUCCESS,
-    API_UBUS_RPC_SESSION_EXPIRES,
-    _get_error_message,
     API_SESSION_METHOD_DESTROY,
     API_SESSION_METHOD_LIST,
+    API_SESSION_METHOD_LOGIN,
+    API_SUBSYS_SESSION,
+    API_UBUS_RPC_SESSION,
+    API_UBUS_RPC_SESSION_EXPIRES,
+    HTTP_STATUS_OK,
+    UBUS_ERROR_SUCCESS,
+    _get_error_message,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,12 +124,16 @@ class Ubus:
         await self._ensure_session_is_valid()
         return await self._api_call(rpc_method, subsystem, method, params)
 
-    async def batch_call(self, rpcs: list[PreparedCall]) -> list[tuple[str, dict | list | None | Exception]] | None:
+    async def batch_call(
+        self, rpcs: list[PreparedCall]
+    ) -> list[tuple[str, dict | list | None | Exception]] | None:
         """Execute multiple API calls in a single batch request."""
         await self._ensure_session_is_valid()
         return await self._batch_call(rpcs)
 
-    async def _batch_call(self, rpcs: list[PreparedCall]) -> list[tuple[str, dict | list | None | Exception]] | None:
+    async def _batch_call(
+        self, rpcs: list[PreparedCall]
+    ) -> list[tuple[str, dict | list | None | Exception]] | None:
         self._ensure_session()
 
         if rpcs[0] and rpcs[0].subsystem != API_SUBSYS_SESSION:
@@ -182,7 +185,7 @@ class Ubus:
                     raise ConnectionError(f"Failed to connect to API after multiple attempts: {e}")
                 else:
                     _LOGGER.debug("Retrying API call... (%d retries left)", retries_left)
-                    await asyncio.sleep(5-retries_left)  # Brief pause before retrying
+                    await asyncio.sleep(5 - retries_left)  # Brief pause before retrying
             except Exception as e:
                 _LOGGER.error("Unexpected error when calling API: %s", e)
                 raise ConnectionError(f"Unexpected error when calling API: {e}")
@@ -216,9 +219,14 @@ class Ubus:
 
                     # Special handling for permission errors
                     if error_code == -32002 or "Access denied" in error_message:
-                        log_fn = _LOGGER.debug if (
-                            subsystem == API_SUBSYS_SESSION and method == API_SESSION_METHOD_DESTROY
-                        ) else _LOGGER.warning
+                        log_fn = (
+                            _LOGGER.debug
+                            if (
+                                subsystem == API_SUBSYS_SESSION
+                                and method == API_SESSION_METHOD_DESTROY
+                            )
+                            else _LOGGER.warning
+                        )
                         log_fn(
                             "Permission denied when calling %s.%s: %s (code: %d) [session_id: %s]",
                             subsystem,
@@ -275,9 +283,13 @@ class Ubus:
                                         )
                                     )
                             else:
-                                _append_result(ConnectionError(f"Unexpected API call result format: {result}"))
+                                _append_result(
+                                    ConnectionError(f"Unexpected API call result format: {result}")
+                                )
                         else:
-                            _append_result(ConnectionError(f"Unexpected API call result format: {result}"))
+                            _append_result(
+                                ConnectionError(f"Unexpected API call result format: {result}")
+                            )
                     else:
                         _append_result(result)
             if results[-1][0] == "refresh_expiration":
@@ -286,9 +298,15 @@ class Ubus:
                     try:
                         raise session_response
                     except (RPCError, PermissionError) as e:
-                        _LOGGER.warning("Failed to retrieve session expiration: %s [session_id: %s]", e, self.session_id)
+                        _LOGGER.warning(
+                            "Failed to retrieve session expiration: %s [session_id: %s]",
+                            e,
+                            self.session_id,
+                        )
                 elif isinstance(session_response, list):
-                    raise ConnectionError(f"Unexpected session API response format: {session_response}")
+                    raise ConnectionError(
+                        f"Unexpected session API response format: {session_response}"
+                    )
                 elif isinstance(session_response, dict):
                     self.session_expire = time.time() + session_response.get("expires", 0)
 

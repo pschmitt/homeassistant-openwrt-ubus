@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
+    CONF_IP_ADDRESS,
     CONF_PASSWORD,
     CONF_USERNAME,
-    CONF_IP_ADDRESS,
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
@@ -21,28 +21,26 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from . import API_DEF_TIMEOUT
 from .const import (
-    CONF_DHCP_SOFTWARE,
-    CONF_WIRELESS_SOFTWARE,
-    CONF_USE_HTTPS,
-    CONF_PORT,
-    CONF_ENDPOINT,
-    CONF_SYSTEM_SENSOR_TIMEOUT,
-    CONF_QMODEM_SENSOR_TIMEOUT,
-    CONF_STA_SENSOR_TIMEOUT,
     CONF_AP_SENSOR_TIMEOUT,
+    CONF_DHCP_SOFTWARE,
+    CONF_ENDPOINT,
     CONF_MWAN3_SENSOR_TIMEOUT,
+    CONF_PORT,
+    CONF_QMODEM_SENSOR_TIMEOUT,
     CONF_SERVICE_TIMEOUT,
-    DOMAIN,
-    DEFAULT_DHCP_SOFTWARE,
-    DEFAULT_WIRELESS_SOFTWARE,
-    DEFAULT_USE_HTTPS,
-    DEFAULT_ENDPOINT,
-    DEFAULT_SYSTEM_SENSOR_TIMEOUT,
-    DEFAULT_QMODEM_SENSOR_TIMEOUT,
-    DEFAULT_STA_SENSOR_TIMEOUT,
+    CONF_STA_SENSOR_TIMEOUT,
+    CONF_SYSTEM_SENSOR_TIMEOUT,
+    CONF_USE_HTTPS,
+    CONF_WIRELESS_SOFTWARE,
     DEFAULT_AP_SENSOR_TIMEOUT,
+    DEFAULT_DHCP_SOFTWARE,
+    DEFAULT_ENDPOINT,
     DEFAULT_MWAN3_SENSOR_TIMEOUT,
+    DEFAULT_QMODEM_SENSOR_TIMEOUT,
     DEFAULT_SERVICE_TIMEOUT,
+    DEFAULT_STA_SENSOR_TIMEOUT,
+    DEFAULT_SYSTEM_SENSOR_TIMEOUT,
+    DEFAULT_USE_HTTPS,
     build_ubus_url,
 )
 from .extended_ubus import ExtendedUbus
@@ -57,8 +55,8 @@ class SharedUbusDataManager:
         """Initialize the shared data manager."""
         self.hass = hass
         self.entry = entry
-        self._data_cache: Dict[str, Dict[str, Any]] = {}
-        self._last_update: Dict[str, datetime] = {}
+        self._data_cache: dict[str, dict[str, Any]] = {}
+        self._last_update: dict[str, datetime] = {}
         self._interface_to_ssid = {}  # Cache for interface->SSID mapping
         self._logged_unavailable_features: set[str] = set()
 
@@ -88,10 +86,12 @@ class SharedUbusDataManager:
             entry.data.get(CONF_MWAN3_SENSOR_TIMEOUT, DEFAULT_MWAN3_SENSOR_TIMEOUT),
         )
 
-        self._update_intervals: Dict[str, timedelta] = {
+        self._update_intervals: dict[str, timedelta] = {
             "system_info": timedelta(seconds=system_timeout),
             "system_stat": timedelta.min,  # /proc/stat changes very frequently
-            "system_board": timedelta(seconds=system_timeout * 2),  # Board info changes less frequently
+            "system_board": timedelta(
+                seconds=system_timeout * 2
+            ),  # Board info changes less frequently
             "qmodem_info": timedelta(seconds=qmodem_timeout),
             "mwan3_status": timedelta(seconds=mwan3_timeout),
             "device_statistics": timedelta(seconds=sta_timeout),
@@ -101,7 +101,9 @@ class SharedUbusDataManager:
             "ap_info": timedelta(seconds=ap_timeout),
             "service_status": timedelta(seconds=service_timeout),  # Use configured service timeout
             "ssid_status": timedelta(seconds=60),  # UCI wireless interface state
-            "hostapd_available": timedelta(minutes=30),  # Very long cache - hostapd availability rarely changes
+            "hostapd_available": timedelta(
+                minutes=30
+            ),  # Very long cache - hostapd availability rarely changes
             "conntrack_count": timedelta(seconds=system_timeout),  # Connection tracking count
             "system_temperatures": timedelta(seconds=system_timeout),  # System temperature sensors
             "dhcp_clients_count": timedelta(seconds=sta_timeout),  # DHCP clients count
@@ -112,11 +114,13 @@ class SharedUbusDataManager:
             "vnstat_monthly": timedelta(seconds=300),
             "speedtest_result": timedelta(seconds=3600),
         }
-        self._update_locks: Dict[str, asyncio.Lock] = {key: asyncio.Lock() for key in self._update_intervals}
+        self._update_locks: dict[str, asyncio.Lock] = {
+            key: asyncio.Lock() for key in self._update_intervals
+        }
 
         # Initialize ubus clients
-        self._ubus_clients: Dict[str, ExtendedUbus] = {}
-        self._client_locks: Dict[str, asyncio.Lock] = {}
+        self._ubus_clients: dict[str, ExtendedUbus] = {}
+        self._client_locks: dict[str, asyncio.Lock] = {}
         self._session = None
 
     async def logout(self):
@@ -164,7 +168,7 @@ class SharedUbusDataManager:
             try:
                 session_id = await client.connect()
                 if session_id is None:
-                    raise UpdateFailed(f"Failed to connect to OpenWrt device")
+                    raise UpdateFailed("Failed to connect to OpenWrt device")
                 self._ubus_clients[client_type] = client
             except Exception as exc:
                 _LOGGER.error("Failed to connect ubus client %s: %s", client_type, exc)
@@ -195,7 +199,7 @@ class SharedUbusDataManager:
         interval = self._update_intervals.get(data_type, timedelta(minutes=1))
         return datetime.now() - self._last_update[data_type] > interval
 
-    async def _fetch_system_info(self) -> Dict[str, Any]:
+    async def _fetch_system_info(self) -> dict[str, Any]:
         """Fetch system information."""
         client = await self._get_ubus_client()
         try:
@@ -205,7 +209,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching system info: %s", exc)
             raise UpdateFailed(f"Error fetching system info: {exc}")
 
-    async def _fetch_system_stat(self) -> Dict[str, Any]:
+    async def _fetch_system_stat(self) -> dict[str, Any]:
         """Fetch system information."""
         client = await self._get_ubus_client()
         try:
@@ -215,7 +219,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching system info: %s", exc)
             raise UpdateFailed(f"Error fetching system info: {exc}")
 
-    async def _fetch_system_board(self) -> Dict[str, Any]:
+    async def _fetch_system_board(self) -> dict[str, Any]:
         """Fetch system board information."""
         client = await self._get_ubus_client()
         try:
@@ -225,7 +229,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching system board: %s", exc)
             raise UpdateFailed(f"Error fetching system board: {exc}")
 
-    async def _fetch_qmodem_info(self) -> Dict[str, Any]:
+    async def _fetch_qmodem_info(self) -> dict[str, Any]:
         """Fetch QModem information if available."""
         client = await self._get_ubus_client("qmodem")
         try:
@@ -239,7 +243,7 @@ class SharedUbusDataManager:
             _LOGGER.debug("Error fetching QModem info: %s", exc)
             return {"qmodem_info": None}
 
-    async def _fetch_mwan3_status(self) -> Dict[str, Any]:
+    async def _fetch_mwan3_status(self) -> dict[str, Any]:
         """Fetch MWAN3 status information if available."""
         client = await self._get_ubus_client("mwan3")
         try:
@@ -253,7 +257,7 @@ class SharedUbusDataManager:
             _LOGGER.debug("Error fetching MWAN3 status: %s", exc)
             return {"mwan3_status": None}
 
-    async def _fetch_hostapd_available(self) -> Dict[str, Any]:
+    async def _fetch_hostapd_available(self) -> dict[str, Any]:
         """Check if hostapd is available via ubus list."""
         client = await self._get_ubus_client()
         try:
@@ -264,7 +268,7 @@ class SharedUbusDataManager:
             _LOGGER.debug("Error checking hostapd availability: %s", exc)
             return {"hostapd_available": False}
 
-    async def _fetch_ap_info(self) -> Dict[str, Any]:
+    async def _fetch_ap_info(self) -> dict[str, Any]:
         """Fetch access point information."""
         client = await self._get_ubus_client("ap")
         try:
@@ -326,14 +330,14 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching SSID status: %s", exc)
             raise UpdateFailed(f"Error fetching SSID status: {exc}") from exc
 
-    async def _get_interface_to_ssid_mapping(self) -> Dict[str, str]:
+    async def _get_interface_to_ssid_mapping(self) -> dict[str, str]:
         """Get mapping of interface names to SSIDs."""
         if not self._interface_to_ssid:
             client = await self._get_ubus_client()
             self._interface_to_ssid = await client.get_interface_to_ssid_mapping()
         return self._interface_to_ssid
 
-    async def _fetch_device_statistics(self) -> Dict[str, Any]:
+    async def _fetch_device_statistics(self) -> dict[str, Any]:
         """Fetch device statistics from wireless interfaces."""
         wireless_software = self.entry.data.get(CONF_WIRELESS_SOFTWARE, "iwinfo")
         dhcp_software = self.entry.data.get(CONF_DHCP_SOFTWARE, "dnsmasq")
@@ -357,8 +361,8 @@ class SharedUbusDataManager:
             raise UpdateFailed(f"Error fetching device statistics: {exc}")
 
     async def _fetch_hostapd_data(
-        self, mac2name: Dict[str, Dict[str, str]], interface_to_ssid: Dict[str, str]
-    ) -> Dict[str, Any]:
+        self, mac2name: dict[str, dict[str, str]], interface_to_ssid: dict[str, str]
+    ) -> dict[str, Any]:
         """Fetch data from hostapd using optimized batch calls."""
         client = await self._get_ubus_client("hostapd")
         try:
@@ -437,8 +441,8 @@ class SharedUbusDataManager:
             raise UpdateFailed(f"Error fetching hostapd data: {exc}")
 
     async def _fetch_iwinfo_data(
-        self, mac2name: Dict[str, Dict[str, str]], interface_to_ssid: Dict[str, str]
-    ) -> Dict[str, Any]:
+        self, mac2name: dict[str, dict[str, str]], interface_to_ssid: dict[str, str]
+    ) -> dict[str, Any]:
         """Fetch data from iwinfo using optimized batch calls."""
         client = await self._get_ubus_client("iwinfo")
         try:
@@ -528,7 +532,7 @@ class SharedUbusDataManager:
             _LOGGER.debug("iwinfo data fetch error details", exc_info=True)
             raise UpdateFailed(f"Error fetching iwinfo data: {exc}")
 
-    async def _get_mac2name_mapping(self, dhcp_software: str) -> Dict[str, Dict[str, str]]:
+    async def _get_mac2name_mapping(self, dhcp_software: str) -> dict[str, dict[str, str]]:
         """Generate MAC to name/IP mapping based on DHCP server."""
         mac2name = {}
         client = await self._get_ubus_client()
@@ -583,13 +587,16 @@ class SharedUbusDataManager:
         except Exception as exc:
             err_str = str(exc)
             if "Not Found" in err_str or "Method not found" in err_str:
-                _LOGGER.debug("DHCP MAC to name mapping is unavailable (expected for AP mode routers without DHCP server): %s", exc)
+                _LOGGER.debug(
+                    "DHCP MAC to name mapping is unavailable (expected for AP mode routers without DHCP server): %s",
+                    exc,
+                )
             else:
                 _LOGGER.debug("Failed to get DHCP MAC to name mapping: %s", exc)
 
         return mac2name
 
-    async def _fetch_conntrack_count(self) -> Dict[str, Any]:
+    async def _fetch_conntrack_count(self) -> dict[str, Any]:
         """Fetch connection tracking count."""
         client = await self._get_ubus_client()
         try:
@@ -599,7 +606,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching connection tracking count: %s", exc)
             raise UpdateFailed(f"Error fetching connection tracking count: {exc}")
 
-    async def _fetch_system_temperatures(self) -> Dict[str, Any]:
+    async def _fetch_system_temperatures(self) -> dict[str, Any]:
         """Fetch system temperature sensors."""
         client = await self._get_ubus_client()
         try:
@@ -609,7 +616,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching system temperatures: %s", exc)
             raise UpdateFailed(f"Error fetching system temperatures: {exc}")
 
-    async def _fetch_dhcp_clients_count(self) -> Dict[str, Any]:
+    async def _fetch_dhcp_clients_count(self) -> dict[str, Any]:
         """Fetch DHCP clients count."""
         client = await self._get_ubus_client()
         try:
@@ -619,7 +626,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching DHCP clients count: %s", exc)
             raise UpdateFailed(f"Error fetching DHCP clients count: {exc}")
 
-    async def _fetch_network_devices(self) -> Dict[str, Any]:
+    async def _fetch_network_devices(self) -> dict[str, Any]:
         """Fetch network device status."""
         client = await self._get_ubus_client()
         try:
@@ -658,21 +665,21 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching network devices: %s", exc, exc_info=True)
             raise UpdateFailed(f"Error fetching network devices: {exc}")
 
-    async def _fetch_wired_devices(self) -> Dict[str, Any]:
+    async def _fetch_wired_devices(self) -> dict[str, Any]:
         """Fetch wired device information from IP neighbor tables.
-        
+
         Returns:
             dict: Dictionary with wired_devices data
         """
         from .const import (
             CONF_ENABLE_WIRED_TRACKER,
+            CONF_WIRED_TRACKER_INTERFACES,
             CONF_WIRED_TRACKER_NAME_PRIORITY,
             CONF_WIRED_TRACKER_WHITELIST,
-            CONF_WIRED_TRACKER_INTERFACES,
             DEFAULT_ENABLE_WIRED_TRACKER,
+            DEFAULT_WIRED_TRACKER_INTERFACES,
             DEFAULT_WIRED_TRACKER_NAME_PRIORITY,
             DEFAULT_WIRED_TRACKER_WHITELIST,
-            DEFAULT_WIRED_TRACKER_INTERFACES,
         )
 
         # Check if wired tracker is enabled
@@ -680,7 +687,7 @@ class SharedUbusDataManager:
             CONF_ENABLE_WIRED_TRACKER,
             self.entry.data.get(CONF_ENABLE_WIRED_TRACKER, DEFAULT_ENABLE_WIRED_TRACKER),
         )
-        
+
         if not enabled:
             return {"wired_devices": {}}
 
@@ -688,7 +695,7 @@ class SharedUbusDataManager:
         try:
             # Get neighbor tables
             neighbors = await client.get_ip_neighbors()
-            
+
             # Check for permission error
             if isinstance(neighbors, dict) and neighbors.get("error") == "permission_denied":
                 _LOGGER.warning(
@@ -698,11 +705,13 @@ class SharedUbusDataManager:
                     "Wired device tracking will be disabled until permissions are granted."
                 )
                 return {"wired_devices": {}}
-            
+
             # Get configuration
             name_priority = self.entry.options.get(
                 CONF_WIRED_TRACKER_NAME_PRIORITY,
-                self.entry.data.get(CONF_WIRED_TRACKER_NAME_PRIORITY, DEFAULT_WIRED_TRACKER_NAME_PRIORITY),
+                self.entry.data.get(
+                    CONF_WIRED_TRACKER_NAME_PRIORITY, DEFAULT_WIRED_TRACKER_NAME_PRIORITY
+                ),
             )
             whitelist = self.entry.options.get(
                 CONF_WIRED_TRACKER_WHITELIST,
@@ -710,7 +719,9 @@ class SharedUbusDataManager:
             )
             interface_filter = self.entry.options.get(
                 CONF_WIRED_TRACKER_INTERFACES,
-                self.entry.data.get(CONF_WIRED_TRACKER_INTERFACES, DEFAULT_WIRED_TRACKER_INTERFACES),
+                self.entry.data.get(
+                    CONF_WIRED_TRACKER_INTERFACES, DEFAULT_WIRED_TRACKER_INTERFACES
+                ),
             )
 
             # Warn if no filtering is configured
@@ -735,18 +746,18 @@ class SharedUbusDataManager:
 
             # Merge IPv4 and IPv6 neighbors by MAC address
             wired_devices = {}
-            
+
             for ip_version in ["ipv4", "ipv6"]:
                 for neighbor in neighbors.get(ip_version, []):
                     mac = neighbor.get("mac")
                     if not mac:
                         continue
-                    
+
                     # Filter out WiFi devices
                     if mac in wifi_macs:
                         _LOGGER.debug("Filtering out WiFi device: %s", mac)
                         continue
-                    
+
                     # Apply interface filtering
                     if interface_filter and not self._matches_interface(neighbor, interface_filter):
                         _LOGGER.debug(
@@ -755,12 +766,12 @@ class SharedUbusDataManager:
                             neighbor.get("interface"),
                         )
                         continue
-                    
+
                     # Apply whitelist filtering
                     if whitelist and not self._matches_whitelist(neighbor, mac, whitelist):
                         _LOGGER.debug("Device %s does not match whitelist, skipping", mac)
                         continue
-                    
+
                     # Merge or create device entry
                     if mac not in wired_devices:
                         wired_devices[mac] = {
@@ -771,13 +782,13 @@ class SharedUbusDataManager:
                             "state": neighbor.get("state"),
                             "connected": True,
                         }
-                    
+
                     # Update IP addresses
                     if ip_version == "ipv4":
                         wired_devices[mac]["ipv4"] = neighbor.get("ip")
                     else:
                         wired_devices[mac]["ipv6"] = neighbor.get("ip")
-                    
+
                     # Update state if more recent
                     if neighbor.get("state") in ["REACHABLE", "PERMANENT"]:
                         wired_devices[mac]["state"] = neighbor.get("state")
@@ -790,7 +801,7 @@ class SharedUbusDataManager:
             for mac, device in wired_devices.items():
                 hostname_data = mac2name.get(mac, {})
                 hostname_from_dhcp = hostname_data.get("hostname", "")
-                
+
                 if hostname_from_dhcp:
                     device["hostname"] = hostname_from_dhcp
                 else:
@@ -803,7 +814,9 @@ class SharedUbusDataManager:
                         device["hostname"] = mac.replace(":", "")
                     else:
                         # Fallback: try ipv4, then ipv6, then mac
-                        device["hostname"] = device["ipv4"] or device["ipv6"] or mac.replace(":", "")
+                        device["hostname"] = (
+                            device["ipv4"] or device["ipv6"] or mac.replace(":", "")
+                        )
 
             _LOGGER.debug("Found %d wired devices after filtering", len(wired_devices))
             return {"wired_devices": wired_devices}
@@ -812,7 +825,7 @@ class SharedUbusDataManager:
             _LOGGER.error("Error fetching wired devices: %s", exc, exc_info=True)
             return {"wired_devices": {}}
 
-    async def _fetch_nlbwmon_top_hosts(self) -> Dict[str, Any]:
+    async def _fetch_nlbwmon_top_hosts(self) -> dict[str, Any]:
         """Fetch top hosts by bandwidth usage using nlbwmon."""
         import json
 
@@ -829,7 +842,14 @@ class SharedUbusDataManager:
 
             stdout = result.get("stdout", "") if isinstance(result, dict) else ""
             if not stdout:
-                return {"nlbwmon_top_hosts": {"top_hosts": [], "host_count": 0, "total_rx_bytes": 0, "total_tx_bytes": 0}}
+                return {
+                    "nlbwmon_top_hosts": {
+                        "top_hosts": [],
+                        "host_count": 0,
+                        "total_rx_bytes": 0,
+                        "total_tx_bytes": 0,
+                    }
+                }
 
             payload = json.loads(stdout)
             columns = payload.get("columns", [])
@@ -941,80 +961,78 @@ class SharedUbusDataManager:
                 }
             }
 
-    async def _fetch_leds(self) -> Dict[str, Any]:
+    async def _fetch_leds(self) -> dict[str, Any]:
         """Fetch LED inventory and current state."""
         client = await self._get_ubus_client()
         leds = await client.list_leds()
         return {"leds": leds}
 
-    async def _fetch_vnstat_monthly(self) -> Dict[str, Any]:
+    async def _fetch_vnstat_monthly(self) -> dict[str, Any]:
         """Fetch compact monthly vnstat data."""
         client = await self._get_ubus_client()
         vnstat_monthly = await client.get_vnstat_monthly()
         return {"vnstat_monthly": vnstat_monthly}
 
-    async def _fetch_speedtest_result(self) -> Dict[str, Any]:
+    async def _fetch_speedtest_result(self) -> dict[str, Any]:
         """Fetch cached speedtest result."""
         client = await self._get_ubus_client()
         speedtest_result = await client.get_speedtest_result()
         return {"speedtest_result": speedtest_result}
 
-
-
     def _matches_interface(self, neighbor: dict, interface_filter: list) -> bool:
         """Check if a neighbor's interface matches any interface filter entry.
-        
+
         Args:
             neighbor: Neighbor entry with interface field
             interface_filter: List of interface names (e.g., ["br-lan", "eth0"])
-            
+
         Returns:
             bool: True if matches interface filter or filter is empty
         """
         # Empty filter means no filtering
         if not interface_filter:
             return True
-        
+
         neighbor_interface = neighbor.get("interface", "")
         if not neighbor_interface:
             return False
-        
+
         # Check if interface matches any in the filter list
         return neighbor_interface in interface_filter
 
     def _matches_whitelist(self, neighbor: dict, mac: str, whitelist: list) -> bool:
         """Check if a neighbor matches any whitelist entry.
-        
+
         Args:
             neighbor: Neighbor entry with ip, mac, etc.
             mac: MAC address
             whitelist: List of prefix strings (IP or MAC prefixes)
-            
+
         Returns:
             bool: True if matches whitelist or whitelist is empty
         """
         # Empty whitelist means no filtering
         if not whitelist:
             return True
-        
+
         ip_addr = neighbor.get("ip", "")
-        
+
         for prefix in whitelist:
             prefix = prefix.strip()
             if not prefix:
                 continue
-            
+
             # Check if it matches IP address
             if ip_addr.startswith(prefix):
                 return True
-            
+
             # Check if it matches MAC address
             if mac.upper().startswith(prefix.upper()):
                 return True
-        
+
         return False
 
-    async def _fetch_system_data_batch(self, system_types: set) -> Dict[str, Any]:
+    async def _fetch_system_data_batch(self, system_types: set) -> dict[str, Any]:
         """Fetch system data in batch with auto-reconnect protection."""
         combined_data = {}
         system_client = await self._get_ubus_client()
@@ -1048,7 +1066,7 @@ class SharedUbusDataManager:
 
         return combined_data
 
-    async def get_data(self, data_type: str) -> Dict[str, Any]:
+    async def get_data(self, data_type: str) -> dict[str, Any]:
         """Get cached data or fetch if needed."""
         # Defensive: If the data_type is not in update_locks, log and raise
         if data_type not in self._update_locks:
@@ -1133,7 +1151,7 @@ class SharedUbusDataManager:
                     return {data_type: self._data_cache[data_type]}
                 raise
 
-    async def get_combined_data(self, data_types: list[str]) -> Dict[str, Any]:
+    async def get_combined_data(self, data_types: list[str]) -> dict[str, Any]:
         """Get multiple data types in a single call to optimize API usage."""
         combined_data = {}
 

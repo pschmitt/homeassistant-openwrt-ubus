@@ -7,16 +7,16 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
+    ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
-    ConfigEntry,
 )
 from homeassistant.const import (
     CONF_HOST,
+    CONF_IP_ADDRESS,
     CONF_PASSWORD,
     CONF_USERNAME,
-    CONF_IP_ADDRESS,
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -25,81 +25,76 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import API_DEF_TIMEOUT
-from .Ubus import Ubus
-from .Ubus.const import API_RPC_CALL
-from .extended_ubus import ExtendedUbus
 from .const import (
+    API_METHOD_LIST,
+    API_SUBSYS_RC,
+    CONF_AP_SENSOR_TIMEOUT,
+    CONF_CONSIDER_HOME,
     CONF_DHCP_SOFTWARE,
-    CONF_WIRELESS_SOFTWARE,
-    CONF_USE_HTTPS,
-    CONF_PORT,
-    CONF_ENDPOINT,
-    CONF_ENABLE_QMODEM_SENSORS,
-    CONF_ENABLE_STA_SENSORS,
-    CONF_ENABLE_SYSTEM_SENSORS,
     CONF_ENABLE_AP_SENSORS,
+    CONF_ENABLE_DEVICE_KICK_BUTTONS,
     CONF_ENABLE_ETH_SENSORS,
     CONF_ENABLE_MWAN3_SENSORS,
     CONF_ENABLE_NLBWMON_SENSORS,
+    CONF_ENABLE_QMODEM_SENSORS,
     CONF_ENABLE_SERVICE_CONTROLS,
     CONF_ENABLE_SSID_SWITCHES,
-    CONF_ENABLE_DEVICE_KICK_BUTTONS,
+    CONF_ENABLE_STA_SENSORS,
+    CONF_ENABLE_SYSTEM_SENSORS,
     CONF_ENABLE_WIRED_TRACKER,
+    CONF_ENABLE_WIRELESS_TRACKERS,
+    CONF_ENDPOINT,
+    CONF_MWAN3_SENSOR_TIMEOUT,
+    CONF_PORT,
+    CONF_QMODEM_SENSOR_TIMEOUT,
+    CONF_SELECT_ALL_STA,
+    CONF_SELECTED_SERVICES,
+    CONF_SELECTED_STA,
+    CONF_SERVICE_TIMEOUT,
+    CONF_STA_SENSOR_TIMEOUT,
+    CONF_SYSTEM_SENSOR_TIMEOUT,
+    CONF_TRACKING_METHOD,
+    CONF_USE_HTTPS,
+    CONF_WIRED_TRACKER_INTERFACES,
     CONF_WIRED_TRACKER_NAME_PRIORITY,
     CONF_WIRED_TRACKER_WHITELIST,
-    CONF_WIRED_TRACKER_INTERFACES,
-    CONF_ENABLE_WIRELESS_TRACKERS,
+    CONF_WIRELESS_SOFTWARE,
     CONF_WIRELESS_TRACKER_WHITELIST,
-    CONF_SELECT_ALL_STA,
-    CONF_SELECTED_STA,
-    CONF_SELECTED_SERVICES,
-    CONF_SYSTEM_SENSOR_TIMEOUT,
-    CONF_QMODEM_SENSOR_TIMEOUT,
-    CONF_STA_SENSOR_TIMEOUT,
-    CONF_AP_SENSOR_TIMEOUT,
-    CONF_MWAN3_SENSOR_TIMEOUT,
-    CONF_SERVICE_TIMEOUT,
-    CONF_TRACKING_METHOD,
+    DEFAULT_AP_SENSOR_TIMEOUT,
+    DEFAULT_CONSIDER_HOME,
     DEFAULT_DHCP_SOFTWARE,
-    DEFAULT_WIRELESS_SOFTWARE,
-    DEFAULT_USE_HTTPS,
-    DEFAULT_PORT_HTTP,
-    DEFAULT_PORT_HTTPS,
-    DEFAULT_ENDPOINT,
-    DEFAULT_ENABLE_QMODEM_SENSORS,
-    DEFAULT_ENABLE_STA_SENSORS,
-    DEFAULT_ENABLE_SYSTEM_SENSORS,
     DEFAULT_ENABLE_AP_SENSORS,
+    DEFAULT_ENABLE_DEVICE_KICK_BUTTONS,
     DEFAULT_ENABLE_ETH_SENSORS,
     DEFAULT_ENABLE_MWAN3_SENSORS,
     DEFAULT_ENABLE_NLBWMON_SENSORS,
+    DEFAULT_ENABLE_QMODEM_SENSORS,
     DEFAULT_ENABLE_SERVICE_CONTROLS,
     DEFAULT_ENABLE_SSID_SWITCHES,
-    DEFAULT_ENABLE_DEVICE_KICK_BUTTONS,
+    DEFAULT_ENABLE_STA_SENSORS,
+    DEFAULT_ENABLE_SYSTEM_SENSORS,
     DEFAULT_ENABLE_WIRED_TRACKER,
-    DEFAULT_WIRED_TRACKER_NAME_PRIORITY,
-    DEFAULT_WIRED_TRACKER_WHITELIST,
-    DEFAULT_WIRED_TRACKER_INTERFACES,
     DEFAULT_ENABLE_WIRELESS_TRACKERS,
+    DEFAULT_ENDPOINT,
+    DEFAULT_MWAN3_SENSOR_TIMEOUT,
+    DEFAULT_QMODEM_SENSOR_TIMEOUT,
     DEFAULT_SELECT_ALL_STA,
     DEFAULT_SELECTED_STA,
-    CONF_CONSIDER_HOME,
-    DEFAULT_CONSIDER_HOME,
-    DEFAULT_SYSTEM_SENSOR_TIMEOUT,
-    DEFAULT_QMODEM_SENSOR_TIMEOUT,
-    DEFAULT_STA_SENSOR_TIMEOUT,
-    DEFAULT_AP_SENSOR_TIMEOUT,
-    DEFAULT_MWAN3_SENSOR_TIMEOUT,
     DEFAULT_SERVICE_TIMEOUT,
+    DEFAULT_STA_SENSOR_TIMEOUT,
+    DEFAULT_SYSTEM_SENSOR_TIMEOUT,
     DEFAULT_TRACKING_METHOD,
+    DEFAULT_USE_HTTPS,
+    DEFAULT_WIRED_TRACKER_NAME_PRIORITY,
+    DEFAULT_WIRELESS_SOFTWARE,
     DHCP_SOFTWARES,
     DOMAIN,
-    WIRELESS_SOFTWARES,
     TRACKING_METHODS,
-    API_SUBSYS_RC,
-    API_METHOD_LIST,
+    WIRELESS_SOFTWARES,
     build_ubus_url,
 )
+from .extended_ubus import ExtendedUbus
+from .Ubus.const import API_RPC_CALL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -114,9 +109,13 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENDPOINT, default=DEFAULT_ENDPOINT): str,
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
-        vol.Optional(CONF_WIRELESS_SOFTWARE, default=DEFAULT_WIRELESS_SOFTWARE): vol.In(WIRELESS_SOFTWARES),
+        vol.Optional(CONF_WIRELESS_SOFTWARE, default=DEFAULT_WIRELESS_SOFTWARE): vol.In(
+            WIRELESS_SOFTWARES
+        ),
         vol.Optional(CONF_DHCP_SOFTWARE, default=DEFAULT_DHCP_SOFTWARE): vol.In(DHCP_SOFTWARES),
-        vol.Optional(CONF_TRACKING_METHOD, default=DEFAULT_TRACKING_METHOD): vol.In(TRACKING_METHODS),
+        vol.Optional(CONF_TRACKING_METHOD, default=DEFAULT_TRACKING_METHOD): vol.In(
+            TRACKING_METHODS
+        ),
     }
 )
 
@@ -132,7 +131,9 @@ STEP_SENSORS_DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENABLE_NLBWMON_SENSORS, default=DEFAULT_ENABLE_NLBWMON_SENSORS): bool,
         vol.Optional(CONF_ENABLE_SERVICE_CONTROLS, default=DEFAULT_ENABLE_SERVICE_CONTROLS): bool,
         vol.Optional(CONF_ENABLE_SSID_SWITCHES, default=DEFAULT_ENABLE_SSID_SWITCHES): bool,
-        vol.Optional(CONF_ENABLE_DEVICE_KICK_BUTTONS, default=DEFAULT_ENABLE_DEVICE_KICK_BUTTONS): bool,
+        vol.Optional(
+            CONF_ENABLE_DEVICE_KICK_BUTTONS, default=DEFAULT_ENABLE_DEVICE_KICK_BUTTONS
+        ): bool,
         vol.Optional(CONF_ENABLE_WIRELESS_TRACKERS, default=DEFAULT_ENABLE_WIRELESS_TRACKERS): bool,
         vol.Optional(CONF_ENABLE_WIRED_TRACKER, default=DEFAULT_ENABLE_WIRED_TRACKER): bool,
     }
@@ -295,7 +296,7 @@ async def get_connected_wifi_devices(hass: HomeAssistant, data: dict[str, Any]) 
                         for lease in device.get("leases", []):
                             mac = lease.get("mac", "")
                             if mac and len(mac) == 12:
-                                mac = ":".join(mac[i: i + 2] for i in range(0, len(mac), 2))
+                                mac = ":".join(mac[i : i + 2] for i in range(0, len(mac), 2))
                                 mac_upper = mac.upper()
                                 if mac_upper not in mac2name:
                                     mac2name[mac_upper] = lease.get("hostname", "")
@@ -361,9 +362,13 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._connection_data = user_input
                 return await self.async_step_sensors()
 
-        return self.async_show_form(step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors)
+        return self.async_show_form(
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
 
-    async def async_step_sensors(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_sensors(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the sensor configuration step."""
         if user_input is not None:
             self._sensor_data = user_input
@@ -392,7 +397,9 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._connection_data[CONF_HOST]},
         )
 
-    async def async_step_sta_sensors_config(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_sta_sensors_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the station sensors device selection step."""
         if user_input is not None:
             self._sensor_data.update(user_input)
@@ -409,7 +416,9 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
 
         # Fetch currently connected devices for checkboxes
         if not self._available_sta_devices:
-            self._available_sta_devices = await get_connected_wifi_devices(self.hass, self._connection_data)
+            self._available_sta_devices = await get_connected_wifi_devices(
+                self.hass, self._connection_data
+            )
 
         sta_sensors_schema = vol.Schema(
             {
@@ -420,7 +429,9 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_SELECTED_STA,
                     default=DEFAULT_SELECTED_STA,
-                ): cv.multi_select({mac: name for mac, name in self._available_sta_devices.items()}),
+                ): cv.multi_select(
+                    {mac: name for mac, name in self._available_sta_devices.items()}
+                ),
             }
         )
 
@@ -430,7 +441,9 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._connection_data[CONF_HOST]},
         )
 
-    async def async_step_wired_tracker_config(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_wired_tracker_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the wired tracker configuration step."""
         if user_input is not None:
             # Merge wired tracker config into sensor data
@@ -466,7 +479,9 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._connection_data[CONF_HOST]},
         )
 
-    async def async_step_wireless_tracker_config(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_wireless_tracker_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the wireless tracker configuration step."""
         if user_input is not None:
             # Merge wireless tracker config into sensor data
@@ -506,7 +521,9 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"host": self._connection_data[CONF_HOST]},
         )
 
-    async def async_step_services(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_services(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the services selection step."""
         errors: dict[str, str] = {}
 
@@ -542,11 +559,15 @@ class OpenwrtUbusConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={
                 "host": self._connection_data[CONF_HOST],
-                "services_count": str(len(self._available_services)) if self._available_services else "0",
+                "services_count": str(len(self._available_services))
+                if self._available_services
+                else "0",
             },
         )
 
-    async def async_step_timeouts(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_timeouts(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the timeout configuration step."""
         if user_input is not None:
             # Process wired tracker whitelist and interfaces from comma-separated strings
@@ -646,12 +667,16 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
         current_data = self.config_entry.data
         options_schema = vol.Schema(
             {
-                vol.Optional(CONF_USE_HTTPS, default=current_data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS)): bool,
+                vol.Optional(
+                    CONF_USE_HTTPS, default=current_data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS)
+                ): bool,
                 vol.Optional(
                     CONF_PORT,
                     description={"suggested_value": current_data.get(CONF_PORT)},
                 ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                vol.Optional(CONF_VERIFY_SSL, default=current_data.get(CONF_VERIFY_SSL, False)): bool,
+                vol.Optional(
+                    CONF_VERIFY_SSL, default=current_data.get(CONF_VERIFY_SSL, False)
+                ): bool,
                 vol.Optional(
                     CONF_ENDPOINT,
                     default=current_data.get(CONF_ENDPOINT, DEFAULT_ENDPOINT),
@@ -670,11 +695,15 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
                 ): vol.In(TRACKING_METHODS),
                 vol.Optional(
                     CONF_ENABLE_SYSTEM_SENSORS,
-                    default=current_data.get(CONF_ENABLE_SYSTEM_SENSORS, DEFAULT_ENABLE_SYSTEM_SENSORS),
+                    default=current_data.get(
+                        CONF_ENABLE_SYSTEM_SENSORS, DEFAULT_ENABLE_SYSTEM_SENSORS
+                    ),
                 ): bool,
                 vol.Optional(
                     CONF_ENABLE_QMODEM_SENSORS,
-                    default=current_data.get(CONF_ENABLE_QMODEM_SENSORS, DEFAULT_ENABLE_QMODEM_SENSORS),
+                    default=current_data.get(
+                        CONF_ENABLE_QMODEM_SENSORS, DEFAULT_ENABLE_QMODEM_SENSORS
+                    ),
                 ): bool,
                 vol.Optional(
                     CONF_ENABLE_STA_SENSORS,
@@ -694,15 +723,21 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
                 ): bool,
                 vol.Optional(
                     CONF_ENABLE_MWAN3_SENSORS,
-                    default=current_data.get(CONF_ENABLE_MWAN3_SENSORS, DEFAULT_ENABLE_MWAN3_SENSORS),
+                    default=current_data.get(
+                        CONF_ENABLE_MWAN3_SENSORS, DEFAULT_ENABLE_MWAN3_SENSORS
+                    ),
                 ): bool,
                 vol.Optional(
                     CONF_ENABLE_NLBWMON_SENSORS,
-                    default=current_data.get(CONF_ENABLE_NLBWMON_SENSORS, DEFAULT_ENABLE_NLBWMON_SENSORS),
+                    default=current_data.get(
+                        CONF_ENABLE_NLBWMON_SENSORS, DEFAULT_ENABLE_NLBWMON_SENSORS
+                    ),
                 ): bool,
                 vol.Optional(
                     CONF_ENABLE_SERVICE_CONTROLS,
-                    default=current_data.get(CONF_ENABLE_SERVICE_CONTROLS, DEFAULT_ENABLE_SERVICE_CONTROLS),
+                    default=current_data.get(
+                        CONF_ENABLE_SERVICE_CONTROLS, DEFAULT_ENABLE_SERVICE_CONTROLS
+                    ),
                 ): bool,
                 vol.Optional(
                     CONF_ENABLE_DEVICE_KICK_BUTTONS,
@@ -711,38 +746,59 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
                         DEFAULT_ENABLE_DEVICE_KICK_BUTTONS,
                     ),
                 ): bool,
-                 vol.Optional(
-                     CONF_ENABLE_WIRELESS_TRACKERS,
-                     default=current_data.get(CONF_ENABLE_WIRELESS_TRACKERS, DEFAULT_ENABLE_WIRELESS_TRACKERS),
-                 ): bool,
-                 vol.Optional(
-                     CONF_WIRELESS_TRACKER_WHITELIST,
-                     description={"suggested_value": ",".join(current_data.get(CONF_WIRELESS_TRACKER_WHITELIST, []))},
-                 ): str,
-                 vol.Optional(
-                     CONF_ENABLE_WIRED_TRACKER,
-                     default=current_data.get(CONF_ENABLE_WIRED_TRACKER, DEFAULT_ENABLE_WIRED_TRACKER),
-                 ): bool,
-
+                vol.Optional(
+                    CONF_ENABLE_WIRELESS_TRACKERS,
+                    default=current_data.get(
+                        CONF_ENABLE_WIRELESS_TRACKERS, DEFAULT_ENABLE_WIRELESS_TRACKERS
+                    ),
+                ): bool,
+                vol.Optional(
+                    CONF_WIRELESS_TRACKER_WHITELIST,
+                    description={
+                        "suggested_value": ",".join(
+                            current_data.get(CONF_WIRELESS_TRACKER_WHITELIST, [])
+                        )
+                    },
+                ): str,
+                vol.Optional(
+                    CONF_ENABLE_WIRED_TRACKER,
+                    default=current_data.get(
+                        CONF_ENABLE_WIRED_TRACKER, DEFAULT_ENABLE_WIRED_TRACKER
+                    ),
+                ): bool,
                 vol.Optional(
                     CONF_WIRED_TRACKER_NAME_PRIORITY,
-                    default=current_data.get(CONF_WIRED_TRACKER_NAME_PRIORITY, DEFAULT_WIRED_TRACKER_NAME_PRIORITY),
+                    default=current_data.get(
+                        CONF_WIRED_TRACKER_NAME_PRIORITY, DEFAULT_WIRED_TRACKER_NAME_PRIORITY
+                    ),
                 ): vol.In(["ipv4", "ipv6", "mac"]),
                 vol.Optional(
                     CONF_WIRED_TRACKER_WHITELIST,
-                    description={"suggested_value": ",".join(current_data.get(CONF_WIRED_TRACKER_WHITELIST, []))},
+                    description={
+                        "suggested_value": ",".join(
+                            current_data.get(CONF_WIRED_TRACKER_WHITELIST, [])
+                        )
+                    },
                 ): str,
                 vol.Optional(
                     CONF_WIRED_TRACKER_INTERFACES,
-                    description={"suggested_value": ",".join(current_data.get(CONF_WIRED_TRACKER_INTERFACES, []))},
+                    description={
+                        "suggested_value": ",".join(
+                            current_data.get(CONF_WIRED_TRACKER_INTERFACES, [])
+                        )
+                    },
                 ): str,
                 vol.Optional(
                     CONF_SYSTEM_SENSOR_TIMEOUT,
-                    default=current_data.get(CONF_SYSTEM_SENSOR_TIMEOUT, DEFAULT_SYSTEM_SENSOR_TIMEOUT),
+                    default=current_data.get(
+                        CONF_SYSTEM_SENSOR_TIMEOUT, DEFAULT_SYSTEM_SENSOR_TIMEOUT
+                    ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=10, max=300)),
                 vol.Optional(
                     CONF_QMODEM_SENSOR_TIMEOUT,
-                    default=current_data.get(CONF_QMODEM_SENSOR_TIMEOUT, DEFAULT_QMODEM_SENSOR_TIMEOUT),
+                    default=current_data.get(
+                        CONF_QMODEM_SENSOR_TIMEOUT, DEFAULT_QMODEM_SENSOR_TIMEOUT
+                    ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
                 vol.Optional(
                     CONF_STA_SENSOR_TIMEOUT,
@@ -754,7 +810,9 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
                 ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
                 vol.Optional(
                     CONF_MWAN3_SENSOR_TIMEOUT,
-                    default=current_data.get(CONF_MWAN3_SENSOR_TIMEOUT, DEFAULT_MWAN3_SENSOR_TIMEOUT),
+                    default=current_data.get(
+                        CONF_MWAN3_SENSOR_TIMEOUT, DEFAULT_MWAN3_SENSOR_TIMEOUT
+                    ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=30, max=600)),
                 vol.Optional(
                     CONF_CONSIDER_HOME,
@@ -770,7 +828,9 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
             description_placeholders={"host": self.config_entry.data[CONF_HOST]},
         )
 
-    async def async_step_services(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_services(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle services configuration."""
         errors: dict[str, str] = {}
 
@@ -790,7 +850,9 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
         # Get available services
         if not self._available_services:
             try:
-                self._available_services = await get_services_list(self.hass, self.config_entry.data)
+                self._available_services = await get_services_list(
+                    self.hass, self.config_entry.data
+                )
             except Exception as exc:
                 _LOGGER.warning("Failed to get services list: %s", exc)
                 errors["base"] = "cannot_get_services"
@@ -823,11 +885,15 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
             errors=errors,
             description_placeholders={
                 "host": self.config_entry.data[CONF_HOST],
-                "services_count": str(len(self._available_services)) if self._available_services else "0",
+                "services_count": str(len(self._available_services))
+                if self._available_services
+                else "0",
             },
         )
 
-    async def async_step_sta_sensors_config(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_sta_sensors_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle station sensors device selection in the options flow."""
         if user_input is not None:
             config_data = {**self._temp_data, **user_input}
@@ -835,7 +901,9 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
 
         # Fetch currently connected devices
         if not self._available_sta_devices:
-            self._available_sta_devices = await get_connected_wifi_devices(self.hass, self.config_entry.data)
+            self._available_sta_devices = await get_connected_wifi_devices(
+                self.hass, self.config_entry.data
+            )
 
         # Include previously selected offline devices so they can be toggled off
         current_selected = self.config_entry.data.get(CONF_SELECTED_STA, [])
@@ -853,7 +921,9 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
                 vol.Optional(
                     CONF_SELECTED_STA,
                     default=current_selected,
-                ): cv.multi_select({mac: name for mac, name in self._available_sta_devices.items()}),
+                ): cv.multi_select(
+                    {mac: name for mac, name in self._available_sta_devices.items()}
+                ),
             }
         )
 

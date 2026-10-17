@@ -25,12 +25,12 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from ..device_helpers import via_device_kwargs
 from ..const import (
-    DOMAIN,
     CONF_SYSTEM_SENSOR_TIMEOUT,
     DEFAULT_SYSTEM_SENSOR_TIMEOUT,
+    DOMAIN,
 )
+from ..device_helpers import via_device_kwargs
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -212,7 +212,9 @@ async def async_setup_entry(
         try:
             await coordinator.async_config_entry_first_refresh()
         except Exception as exc:
-            _LOGGER.warning("Initial network interface data fetch failed, will retry automatically: %s", exc)
+            _LOGGER.warning(
+                "Initial network interface data fetch failed, will retry automatically: %s", exc
+            )
 
     entry.async_create_background_task(
         hass, _refresh_network_devices(), "openwrt_ubus_refresh_network_devices"
@@ -247,7 +249,9 @@ class NetworkInterfaceSensor(CoordinatorEntity, SensorEntity):
             name=f"{device_name}",
             manufacturer="OpenWrt",
             model=self._get_device_type(),
-            **via_device_kwargs(coordinator.hass, f"{self._host}_eth", coordinator.data_manager.entry.entry_id),  # Link to main router device
+            **via_device_kwargs(
+                coordinator.hass, f"{self._host}_eth", coordinator.data_manager.entry.entry_id
+            ),  # Link to main router device
         )
 
     def _get_device_type(self) -> str:
@@ -339,7 +343,9 @@ class NetworkInterfaceSensor(CoordinatorEntity, SensorEntity):
                     "flow_control_autoneg": flow_control.get("autoneg", False),
                     "flow_control_supported": flow_control.get("supported", []),
                     "flow_control_advertising": flow_control.get("link-advertising", []),
-                    "flow_control_partner_advertising": flow_control.get("link-partner-advertising", []),
+                    "flow_control_partner_advertising": flow_control.get(
+                        "link-partner-advertising", []
+                    ),
                     "flow_control_negotiated": flow_control.get("negotiated", []),
                 }
             )

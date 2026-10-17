@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
@@ -14,7 +14,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ..const import DOMAIN, CONF_PORT, CONF_USE_HTTPS, DEFAULT_USE_HTTPS, build_configuration_url
+from ..const import CONF_PORT, CONF_USE_HTTPS, DEFAULT_USE_HTTPS, DOMAIN, build_configuration_url
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 SCAN_INTERVAL = timedelta(seconds=60)
@@ -66,9 +66,7 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial nlbwmon data fetch failed, will retry automatically: %s", exc)
 
-    entry.async_create_background_task(
-        hass, _refresh_nlbwmon(), "openwrt_ubus_refresh_nlbwmon"
-    )
+    entry.async_create_background_task(hass, _refresh_nlbwmon(), "openwrt_ubus_refresh_nlbwmon")
     return coordinator
 
 

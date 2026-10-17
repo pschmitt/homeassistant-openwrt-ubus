@@ -100,9 +100,7 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.warning("Initial SSID data fetch failed for %s: %s", entry.data[CONF_HOST], exc)
 
-    entry.async_create_background_task(
-        hass, _refresh_ssids(), "openwrt_ubus_refresh_ssids"
-    )
+    entry.async_create_background_task(hass, _refresh_ssids(), "openwrt_ubus_refresh_ssids")
 
 
 class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
@@ -200,9 +198,7 @@ class OpenwrtSSIDSwitch(CoordinatorEntity, SwitchEntity):
         try:
             ubus = await self.coordinator.data_manager.get_ubus_connection_async()
             for section in self._sections:
-                await ubus.uci_set_option(
-                    "wireless", section, "disabled", "1" if disabled else "0"
-                )
+                await ubus.uci_set_option("wireless", section, "disabled", "1" if disabled else "0")
             await ubus.uci_commit_config("wireless")
             await ubus.wifi_reload()
             _LOGGER.info(

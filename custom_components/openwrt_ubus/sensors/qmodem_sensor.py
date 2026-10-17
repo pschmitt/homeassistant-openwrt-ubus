@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
 import re
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -16,11 +16,10 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_HOST,
-    PERCENTAGE,
+    SIGNAL_STRENGTH_DECIBELS,
+    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     UnitOfElectricPotential,
     UnitOfTemperature,
-    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-    SIGNAL_STRENGTH_DECIBELS,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -29,16 +28,16 @@ from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
 
-from ..device_helpers import via_device_kwargs
 from ..const import (
-    DOMAIN,
-    CONF_USE_HTTPS,
     CONF_PORT,
-    DEFAULT_USE_HTTPS,
     CONF_QMODEM_SENSOR_TIMEOUT,
+    CONF_USE_HTTPS,
     DEFAULT_QMODEM_SENSOR_TIMEOUT,
+    DEFAULT_USE_HTTPS,
+    DOMAIN,
     build_configuration_url,
 )
+from ..device_helpers import via_device_kwargs
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -234,9 +233,7 @@ async def async_setup_entry(
         async_add_entities(entities, False)
         _LOGGER.info("QModem entities created - modem_ctrl is available")
 
-    entry.async_create_background_task(
-        hass, _refresh_qmodem(), "openwrt_ubus_refresh_qmodem"
-    )
+    entry.async_create_background_task(hass, _refresh_qmodem(), "openwrt_ubus_refresh_qmodem")
     return coordinator
 
 
@@ -294,7 +291,9 @@ class QModemSensor(CoordinatorEntity, SensorEntity):
                 self.coordinator.data_manager.entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS),
                 self.coordinator.data_manager.entry.data.get(CONF_PORT),
             ),
-            **via_device_kwargs(self.hass, self._host, self.coordinator.data_manager.entry.entry_id),
+            **via_device_kwargs(
+                self.hass, self._host, self.coordinator.data_manager.entry.entry_id
+            ),
         )
 
     @property

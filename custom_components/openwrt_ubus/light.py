@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import timedelta
 import logging
 import re
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.light import ATTR_EFFECT, ColorMode, LightEntity, LightEntityFeature
@@ -13,8 +13,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
@@ -134,9 +134,7 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.debug("Initial LED data fetch failed: %s", exc)
 
-    entry.async_create_background_task(
-        hass, _refresh_leds(), "openwrt_ubus_refresh_leds"
-    )
+    entry.async_create_background_task(hass, _refresh_leds(), "openwrt_ubus_refresh_leds")
 
 
 class OpenwrtLedLight(CoordinatorEntity, LightEntity):
@@ -145,7 +143,9 @@ class OpenwrtLedLight(CoordinatorEntity, LightEntity):
     _attr_has_entity_name = True
     _attr_entity_registry_visible_default = False
 
-    def __init__(self, coordinator: SharedDataUpdateCoordinator, entry: ConfigEntry, led_name: str) -> None:
+    def __init__(
+        self, coordinator: SharedDataUpdateCoordinator, entry: ConfigEntry, led_name: str
+    ) -> None:
         """Initialize the light."""
         super().__init__(coordinator)
         self.entry = entry
@@ -373,11 +373,7 @@ class OpenwrtLedLightGroup(CoordinatorEntity, LightEntity):
     @property
     def supported_features(self) -> LightEntityFeature:
         """Return supported features."""
-        return (
-            LightEntityFeature.EFFECT
-            if self.effect_list
-            else LightEntityFeature(0)
-        )
+        return LightEntityFeature.EFFECT if self.effect_list else LightEntityFeature(0)
 
     @property
     def effect_list(self) -> list[str] | None:

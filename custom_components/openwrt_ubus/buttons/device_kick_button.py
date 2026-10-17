@@ -5,17 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.button import ButtonEntity, ButtonDeviceClass
+from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers import entity_registry as er
-from homeassistant.exceptions import HomeAssistantError
 
+from ..const import CONF_TRACKING_METHOD, DEFAULT_TRACKING_METHOD, DOMAIN, normalize_ap_device_name
 from ..device_helpers import via_device_kwargs
-from ..const import DOMAIN, CONF_TRACKING_METHOD, DEFAULT_TRACKING_METHOD, normalize_ap_device_name
 from ..shared_data_manager import SharedDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ async def async_setup_entry(
 
     # Store coordinator in hass data for later reference
     hass.data.setdefault(DOMAIN, {})
-    coordinators_key = f"device_kick_coordinators"
+    coordinators_key = "device_kick_coordinators"
     if coordinators_key not in hass.data[DOMAIN]:
         hass.data[DOMAIN][coordinators_key] = {}
     hass.data[DOMAIN][coordinators_key][entry.entry_id] = coordinator
@@ -291,7 +291,9 @@ async def async_setup_entry(
                             if reg_entry.original_name != new_name:
                                 update_kwargs["original_name"] = new_name
                             if reg_entry.name and old_hostname in reg_entry.name:
-                                update_kwargs["name"] = reg_entry.name.replace(old_hostname, new_hostname)
+                                update_kwargs["name"] = reg_entry.name.replace(
+                                    old_hostname, new_hostname
+                                )
                             if update_kwargs:
                                 entry_reg.async_update_entity(existing.entity_id, **update_kwargs)
                                 _LOGGER.info(
@@ -337,7 +339,9 @@ async def async_setup_entry(
         try:
             await coordinator.async_config_entry_first_refresh()
         except Exception as exc:
-            _LOGGER.warning("Initial device kick button data fetch failed, will retry automatically: %s", exc)
+            _LOGGER.warning(
+                "Initial device kick button data fetch failed, will retry automatically: %s", exc
+            )
 
     entry.async_create_background_task(
         hass, _refresh_device_kick_buttons(), "openwrt_ubus_refresh_device_kick_buttons"
@@ -419,7 +423,12 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
         device_info = self._get_device_info()
         device_name = device_info.get("hostname", self._initial_device_name)
 
-        if not device_name or device_name == "Unknown" or device_name == "*" or device_name == self._device_mac:
+        if (
+            not device_name
+            or device_name == "Unknown"
+            or device_name == "*"
+            or device_name == self._device_mac
+        ):
             clean_name = self._device_mac.replace(":", "_").lower()
         else:
             clean_name = device_name.split(".")[0].replace("-", "_").replace(" ", "_").lower()
@@ -437,7 +446,12 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
         device_name = device_info.get("hostname", self._initial_device_name)
         ap_ssid = device_info.get("ap_ssid", "Unknown Network")
 
-        if not device_name or device_name == "Unknown" or device_name == "*" or device_name == self._device_mac:
+        if (
+            not device_name
+            or device_name == "Unknown"
+            or device_name == "*"
+            or device_name == self._device_mac
+        ):
             return f"Kick {self._device_mac} from {ap_ssid}"
         else:
             return f"Kick {device_name} from {ap_ssid}"
@@ -460,7 +474,11 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
         # For combined tracking, set via_device to local AP
         if self._tracking_method == "combined" and ap_device != "unknown":
             device_info_dict.update(
-                via_device_kwargs(self.hass, f"{self._host}_ap_{ap_device}", self.coordinator.data_manager.entry.entry_id)
+                via_device_kwargs(
+                    self.hass,
+                    f"{self._host}_ap_{ap_device}",
+                    self.coordinator.data_manager.entry.entry_id,
+                )
             )
 
         return DeviceInfo(**device_info_dict)
@@ -534,7 +552,10 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
                     current_state = True
 
         # Log availability state changes
-        if self._previous_available_state is not None and self._previous_available_state != current_state:
+        if (
+            self._previous_available_state is not None
+            and self._previous_available_state != current_state
+        ):
             if current_state:
                 _LOGGER.info(
                     "Button %s: Device %s became available (reconnected or hostapd restored)",
@@ -570,7 +591,9 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
             "router": self._host,
             "ap_device": ap_device,
             "ap_ssid": ap_ssid,
-            "hostapd_interface": ap_device if ap_device.startswith("hostapd.") else f"hostapd.{ap_device}",
+            "hostapd_interface": ap_device
+            if ap_device.startswith("hostapd.")
+            else f"hostapd.{ap_device}",
         }
 
     async def async_press(self) -> None:
@@ -583,9 +606,13 @@ class DeviceKickButton(CoordinatorEntity[SharedDataUpdateCoordinator], ButtonEnt
             hostname = device_info.get("hostname", self._initial_device_name)
 
             if not ap_device:
-                raise HomeAssistantError(f"Cannot kick device {hostname}: no AP information available")
+                raise HomeAssistantError(
+                    f"Cannot kick device {hostname}: no AP information available"
+                )
 
-            hostapd_interface = ap_device if ap_device.startswith("hostapd.") else f"hostapd.{ap_device}"
+            hostapd_interface = (
+                ap_device if ap_device.startswith("hostapd.") else f"hostapd.{ap_device}"
+            )
 
             _LOGGER.info(
                 "Kicking device %s (%s) from %s/%s (%s)",

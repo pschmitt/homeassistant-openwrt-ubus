@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, UnitOfDataRate, UnitOfInformation
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -73,9 +72,7 @@ async def async_setup_entry(
         except Exception as exc:
             _LOGGER.debug("Initial extras data fetch failed: %s", exc)
 
-    entry.async_create_background_task(
-        hass, _refresh_extras(), "openwrt_ubus_refresh_extras"
-    )
+    entry.async_create_background_task(hass, _refresh_extras(), "openwrt_ubus_refresh_extras")
 
 
 class OpenwrtExtraSensor(CoordinatorEntity, SensorEntity):

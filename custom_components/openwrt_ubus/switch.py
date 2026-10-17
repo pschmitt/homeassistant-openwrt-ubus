@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+import asyncio
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -14,20 +15,12 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
-    DataUpdateCoordinator,
-    UpdateFailed,
 )
-import asyncio
 
 from .const import (
-    CONF_SELECTED_SERVICES,
     CONF_ENABLE_SERVICE_CONTROLS,
-    CONF_ENABLE_SSID_SWITCHES,
-    DEFAULT_ENABLE_SSID_SWITCHES,
+    CONF_SELECTED_SERVICES,
     DOMAIN,
-    API_SUBSYS_RC,
-    API_METHOD_LIST,
-    API_METHOD_INIT,
 )
 from .shared_data_manager import SharedDataUpdateCoordinator
 from .switches.ssid_switch import async_setup_entry as async_setup_ssid_switches
@@ -70,7 +63,9 @@ async def async_setup_entry(
                 try:
                     await coordinator.async_config_entry_first_refresh()
                 except Exception as exc:
-                    _LOGGER.warning("Initial service data fetch failed, will retry automatically: %s", exc)
+                    _LOGGER.warning(
+                        "Initial service data fetch failed, will retry automatically: %s", exc
+                    )
 
             entry.async_create_background_task(
                 hass, _refresh_service_status(), "openwrt_ubus_refresh_service_status"
@@ -190,10 +185,11 @@ class OpenwrtServiceSwitch(CoordinatorEntity, SwitchEntity):
 
             # Invalidate service status cache
             self.coordinator.data_manager.invalidate_cache("service_status")
-            
+
             async def delayed_refresh():
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
+
             self.hass.async_create_task(delayed_refresh())
 
         except Exception as exc:
@@ -216,10 +212,11 @@ class OpenwrtServiceSwitch(CoordinatorEntity, SwitchEntity):
 
             # Invalidate service status cache
             self.coordinator.data_manager.invalidate_cache("service_status")
-            
+
             async def delayed_refresh():
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
+
             self.hass.async_create_task(delayed_refresh())
 
         except Exception as exc:
