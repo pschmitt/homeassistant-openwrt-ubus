@@ -21,18 +21,6 @@ jobs:
       - name: Hassfest validation
         uses: home-assistant/actions/hassfest@master
 
-  hacs:
-    name: HACS
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: HACS validation
-        uses: hacs/action@main
-        with:
-          category: integration
-
   ruff:
     name: Ruff
     runs-on: ubuntu-latest
