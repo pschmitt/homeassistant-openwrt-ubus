@@ -130,7 +130,7 @@ async def async_setup_entry(
 
     async def _refresh_leds() -> None:
         try:
-            await coordinator.async_config_entry_first_refresh()
+            await coordinator.async_refresh()
         except Exception as exc:
             _LOGGER.debug("Initial LED data fetch failed: %s", exc)
 

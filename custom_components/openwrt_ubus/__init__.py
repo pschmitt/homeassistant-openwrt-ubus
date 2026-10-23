@@ -125,32 +125,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Test connection before setting up platforms
     hostname = entry.data[CONF_HOST]
     try:
-        ip = entry.data.get(CONF_IP_ADDRESS, None)
-        use_https = entry.data.get(CONF_USE_HTTPS, DEFAULT_USE_HTTPS)
-        port = entry.data.get(CONF_PORT)
-        endpoint = entry.data.get(CONF_ENDPOINT, DEFAULT_ENDPOINT)
-        url = build_ubus_url(hostname, use_https, ip, port, endpoint)
-        session = async_get_clientsession(hass, verify_ssl=entry.data.get(CONF_VERIFY_SSL, False))
-        ubus = ExtendedUbus(
-            url,
-            hostname,
-            entry.data[CONF_USERNAME],
-            entry.data[CONF_PASSWORD],
-            session=session,
-            timeout=API_DEF_TIMEOUT,
-            verify=entry.data.get(CONF_VERIFY_SSL, False),
-        )
-
-        # Test connection
-        session_id = await ubus.connect()
-        if session_id is None:
-            raise ConfigEntryNotReady(f"Failed to connect to OpenWrt device at {hostname}")
-
-        # Close the test connection — logout first to destroy the rpcd session,
-        # otherwise the session lingers until rpcd's own 300 s GC runs.
-        await ubus.logout()
-        await ubus.close()
-
         # Create shared data manager
         data_manager = SharedUbusDataManager(hass, entry)
         hass.data[DOMAIN][f"data_manager_{entry.entry_id}"] = data_manager

@@ -525,7 +525,7 @@ async def async_setup_entry(
 
     async def _refresh_sta_devices() -> None:
         try:
-            await coordinator.async_config_entry_first_refresh()
+            await coordinator.async_refresh()
         except Exception as exc:
             _LOGGER.warning(
                 "Initial STA sensor data fetch failed, will retry automatically: %s", exc

@@ -337,7 +337,7 @@ async def async_setup_entry(
 
     async def _refresh_device_kick_buttons() -> None:
         try:
-            await coordinator.async_config_entry_first_refresh()
+            await coordinator.async_refresh()
         except Exception as exc:
             _LOGGER.warning(
                 "Initial device kick button data fetch failed, will retry automatically: %s", exc
