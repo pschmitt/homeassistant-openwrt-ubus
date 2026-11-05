@@ -1,5 +1,6 @@
 {
     "name": "OpenWrt ubus",
+    "homeassistant": "2026.11.0",
     "country": [
         "CN",
         "US",

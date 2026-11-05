@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import voluptuous as vol
+import probatio as vol
+from homeassistant import data_entry_flow
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -105,7 +106,11 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_IP_ADDRESS): str,
         vol.Optional(CONF_USE_HTTPS, default=DEFAULT_USE_HTTPS): bool,
         vol.Optional(CONF_PORT): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-        vol.Optional(CONF_VERIFY_SSL, default=False): bool,
+        data_entry_flow.Optional(
+            CONF_VERIFY_SSL,
+            default=False,
+            visible={"field": CONF_USE_HTTPS, "value": True},
+        ): bool,
         vol.Optional(CONF_ENDPOINT, default=DEFAULT_ENDPOINT): str,
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
@@ -674,8 +679,10 @@ class OpenwrtUbusOptionsFlow(OptionsFlow):
                     CONF_PORT,
                     description={"suggested_value": current_data.get(CONF_PORT)},
                 ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                vol.Optional(
-                    CONF_VERIFY_SSL, default=current_data.get(CONF_VERIFY_SSL, False)
+                data_entry_flow.Optional(
+                    CONF_VERIFY_SSL,
+                    default=current_data.get(CONF_VERIFY_SSL, False),
+                    visible={"field": CONF_USE_HTTPS, "value": True},
                 ): bool,
                 vol.Optional(
                     CONF_ENDPOINT,
