@@ -74,6 +74,11 @@ Proper device hierarchy with via_device relationships:
 
 ## 📥 Installation & Setup
 
+For Home Assistant 2026.11 and later, use the Marketplace badge below to add
+this repository as a custom repository and install the integration.
+
+[![Open this integration in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&repository=homeassistant-openwrt-ubus&category=integration)
+
 ### Prerequisites ✅
 
 Before installing the integration, ensure your OpenWrt router meets these requirements:
@@ -120,7 +125,7 @@ service uhttpd start && service uhttpd enable
 
 5. **🔍 Search**: Look for "OpenWrt ubus" and follow the setup wizard
 
-#### Method 2: HACS Installation (Recommended) 🌟
+#### Method 2: HACS custom repository (older Home Assistant versions)
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=pschmitt&repository=homeassistant-openwrt-ubus&category=integration)
 
@@ -482,9 +487,9 @@ Reads a UCI option value through ubus and can optionally store the result in a H
 | Field | Required | Description |
 |-------|----------|-------------|
 | `config` | ✓ | UCI config name (e.g. `firewall`, `wireless`, `dhcp`) |
-| `section` | optional | Section name or type/index (e.g. `block_user_7085c2` or `@rule[3]`) |
+| `section` | optional | Section name or type/index (e.g. `block_example_device` or `@rule[3]`) |
 | `option` | optional | Option key to retrieve (e.g. `enabled`) |
-| `target_entity_id` | optional | Sensor entity ID to update with the result (e.g. `sensor.block_user_7085c2_enabled`) |
+| `target_entity_id` | optional | Sensor entity ID to update with the result (e.g. `sensor.block_example_device_enabled`) |
 
 **Example: store firewall rule status into a sensor**
 
@@ -492,9 +497,9 @@ Reads a UCI option value through ubus and can optionally store the result in a H
 service: openwrt_ubus.uci_get
 data:
   config: firewall
-  section: block_user_7085c2
+  section: block_example_device
   option: enabled
-  target_entity_id: sensor.block_user_7085c2_enabled
+  target_entity_id: sensor.block_example_device_enabled
 ```
 
 When `target_entity_id` is provided, the integration will update that entity's state with the retrieved UCI value (for example, `"0"` or `"1"`).
@@ -518,7 +523,7 @@ Sets a UCI option value and immediately commits the change.
 service: openwrt_ubus.uci_set_commit
 data:
   config: firewall
-  section: block_user_7085c2
+  section: block_example_device
   option: enabled
   value: "1"
 ```
@@ -529,7 +534,7 @@ data:
 service: openwrt_ubus.uci_set_commit
 data:
   config: firewall
-  section: block_user_7085c2
+  section: block_example_device
   option: enabled
   value: "0"
 ```
@@ -550,9 +555,9 @@ automation:
       - service: openwrt_ubus.uci_get
         data:
           config: firewall
-          section: block_user_7085c2
+          section: block_example_device
           option: enabled
-          target_entity_id: sensor.block_user_7085c2_enabled
+          target_entity_id: sensor.block_example_device_enabled
 ```
 
 **2. Template switch that uses the UCI-backed sensor for state and UCI calls for actions**
@@ -561,23 +566,23 @@ automation:
 switch:
   - platform: template
     switches:
-      user_7085c2_internet:
-        friendly_name: "User Internet 70:85:C2:89:EC:74"
+      example_device_internet:
+        friendly_name: "Example Device Internet"
         # ON = firewall rule disabled (0) = internet allowed
         value_template: >
-          {{ is_state('sensor.block_user_7085c2_enabled', '0') }}
+          {{ is_state('sensor.block_example_device_enabled', '0') }}
         turn_on:
           - service: openwrt_ubus.uci_set_commit
             data:
               config: firewall
-              section: block_user_7085c2
+              section: block_example_device
               option: enabled
               value: "0"
         turn_off:
           - service: openwrt_ubus.uci_set_commit
             data:
               config: firewall
-              section: block_user_7085c2
+              section: block_example_device
               option: enabled
               value: "1"
 ```
