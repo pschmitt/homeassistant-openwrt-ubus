@@ -34,12 +34,13 @@ async def async_setup_entry(
     coordinator = SharedDataUpdateCoordinator(
         hass,
         data_manager,
-        ["vnstat_monthly", "speedtest_result"],
+        ["vnstat_monthly", "vnstat_daily", "speedtest_result"],
         f"{DOMAIN}_extras_{entry.data[CONF_HOST]}",
         SCAN_INTERVAL,
     )
 
     coordinator.known_vnstat_interfaces = set()
+    coordinator.known_vnstat_daily_interfaces = set()
 
     async def _add_new_vnstat_entities() -> None:
         vnstat_data = (coordinator.data or {}).get("vnstat_monthly", {})
@@ -47,10 +48,18 @@ async def async_setup_entry(
             return
 
         new_interfaces = set(vnstat_data) - coordinator.known_vnstat_interfaces
-        if not new_interfaces:
+        daily_data = (coordinator.data or {}).get("vnstat_daily", {})
+        if not isinstance(daily_data, dict):
+            daily_data = {}
+        new_daily = set(daily_data) - coordinator.known_vnstat_daily_interfaces
+        if not new_interfaces and not new_daily:
             return
 
         new_entities = []
+
+        for interface in sorted(new_daily):
+            new_entities.append(OpenwrtVnstatDailySensor(coordinator, entry, interface))
+            coordinator.known_vnstat_daily_interfaces.add(interface)
 
         for interface in sorted(new_interfaces):
             new_entities.append(OpenwrtVnstatMonthlySensor(coordinator, entry, interface))
@@ -147,6 +156,7 @@ class OpenwrtSpeedtestSensor(OpenwrtExtraSensor):
 class OpenwrtVnstatMonthlySensor(OpenwrtExtraSensor):
     """Representation of per-interface monthly traffic from vnstat."""
 
+    _data_key = "vnstat_monthly"
     _attr_icon = "mdi:wan"
     _attr_device_class = SensorDeviceClass.DATA_SIZE
     _attr_native_unit_of_measurement = UnitOfInformation.GIBIBYTES
@@ -166,12 +176,12 @@ class OpenwrtVnstatMonthlySensor(OpenwrtExtraSensor):
     @property
     def available(self) -> bool:
         """Return True if vnstat data for this interface is available."""
-        return self.interface in (self.coordinator.data or {}).get("vnstat_monthly", {})
+        return self.interface in (self.coordinator.data or {}).get(self._data_key, {})
 
     @property
     def native_value(self) -> float | None:
         """Return the current monthly traffic total in GiB."""
-        data = (self.coordinator.data or {}).get("vnstat_monthly", {}).get(self.interface)
+        data = (self.coordinator.data or {}).get(self._data_key, {}).get(self.interface)
         if not isinstance(data, dict):
             return None
 
@@ -180,8 +190,25 @@ class OpenwrtVnstatMonthlySensor(OpenwrtExtraSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return vnstat traffic details."""
-        data = (self.coordinator.data or {}).get("vnstat_monthly", {}).get(self.interface)
+        data = (self.coordinator.data or {}).get(self._data_key, {}).get(self.interface)
         if not isinstance(data, dict):
             return {"interface": self.interface}
 
         return data
+
+
+class OpenwrtVnstatDailySensor(OpenwrtVnstatMonthlySensor):
+    """Representation of per-interface daily traffic from vnstat."""
+
+    _data_key = "vnstat_daily"
+
+    def __init__(
+        self,
+        coordinator: SharedDataUpdateCoordinator,
+        entry: ConfigEntry,
+        interface: str,
+    ) -> None:
+        """Initialize the vnstat daily sensor."""
+        super().__init__(coordinator, entry, interface)
+        self._attr_name = f"Daily Traffic {interface}"
+        self._attr_unique_id = f"{self._host}_vnstat_{interface}_daily_traffic"

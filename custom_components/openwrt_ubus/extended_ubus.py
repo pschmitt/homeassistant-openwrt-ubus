@@ -252,8 +252,16 @@ class ExtendedUbus(Ubus):
 
     async def get_vnstat_monthly(self):
         """Return compact vnstat monthly JSON for all interfaces."""
+        return await self._get_vnstat("m", "month")
+
+    async def get_vnstat_daily(self):
+        """Return compact vnstat daily JSON for all interfaces."""
+        return await self._get_vnstat("d", "day")
+
+    async def _get_vnstat(self, mode: str, key: str):
+        """Return compact vnstat JSON for the latest non-future period per interface."""
         try:
-            result = await self.file_exec("/usr/bin/vnstat", ["--json", "m", "2"])
+            result = await self.file_exec("/usr/bin/vnstat", ["--json", mode, "2"])
             if result.get("code") != 0:
                 return {}
 
@@ -267,15 +275,15 @@ class ExtendedUbus(Ubus):
 
             for interface in payload.get("interfaces", []):
                 name = interface.get("name")
-                months = interface.get("traffic", {}).get("month", [])
-                if not name or not months:
+                periods = interface.get("traffic", {}).get(key, [])
+                if not name or not periods:
                     continue
 
-                non_future_months = [month for month in months if month.get("timestamp", 0) <= now]
-                latest_month = non_future_months[-1] if non_future_months else months[-1]
+                non_future = [p for p in periods if p.get("timestamp", 0) <= now]
+                latest = non_future[-1] if non_future else periods[-1]
 
-                rx = int(latest_month.get("rx", 0))
-                tx = int(latest_month.get("tx", 0))
+                rx = int(latest.get("rx", 0))
+                tx = int(latest.get("tx", 0))
                 total = rx + tx
 
                 interfaces[name] = {
@@ -286,13 +294,13 @@ class ExtendedUbus(Ubus):
                     "rx_gb": round(rx / 1024 / 1024 / 1024, 2),
                     "tx_gb": round(tx / 1024 / 1024 / 1024, 2),
                     "total_gb": round(total / 1024 / 1024 / 1024, 2),
-                    "timestamp": latest_month.get("timestamp"),
-                    "date": latest_month.get("date"),
+                    "timestamp": latest.get("timestamp"),
+                    "date": latest.get("date"),
                 }
 
             return interfaces
         except Exception as exc:
-            _LOGGER.debug("Error reading vnstat monthly data: %s", exc)
+            _LOGGER.debug("Error reading vnstat %s data: %s", key, exc)
             return {}
 
     async def get_speedtest_result(self):

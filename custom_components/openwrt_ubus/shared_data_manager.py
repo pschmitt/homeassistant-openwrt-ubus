@@ -112,6 +112,7 @@ class SharedUbusDataManager:
             "nlbwmon_top_hosts": timedelta(seconds=60),  # Per-host bandwidth usage via nlbwmon
             "leds": timedelta(seconds=300),
             "vnstat_monthly": timedelta(seconds=300),
+            "vnstat_daily": timedelta(seconds=300),
             "speedtest_result": timedelta(seconds=3600),
         }
         self._update_locks: dict[str, asyncio.Lock] = {
@@ -973,6 +974,12 @@ class SharedUbusDataManager:
         vnstat_monthly = await client.get_vnstat_monthly()
         return {"vnstat_monthly": vnstat_monthly}
 
+    async def _fetch_vnstat_daily(self) -> dict[str, Any]:
+        """Fetch compact daily vnstat data."""
+        client = await self._get_ubus_client()
+        vnstat_daily = await client.get_vnstat_daily()
+        return {"vnstat_daily": vnstat_daily}
+
     async def _fetch_speedtest_result(self) -> dict[str, Any]:
         """Fetch cached speedtest result."""
         client = await self._get_ubus_client()
@@ -1122,6 +1129,8 @@ class SharedUbusDataManager:
                     data = await self._fetch_leds()
                 elif data_type == "vnstat_monthly":
                     data = await self._fetch_vnstat_monthly()
+                elif data_type == "vnstat_daily":
+                    data = await self._fetch_vnstat_daily()
                 elif data_type == "speedtest_result":
                     data = await self._fetch_speedtest_result()
                 else:
