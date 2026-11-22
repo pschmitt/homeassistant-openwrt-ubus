@@ -13,26 +13,10 @@ concurrency:
 jobs:
   hassfest:
     name: Hassfest
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Hassfest validation
-        uses: home-assistant/actions/hassfest@master
+    uses: pschmitt/ci-workflows/.github/workflows/home-assistant-hassfest.yaml@main
 
   ruff:
     name: Ruff
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Run Ruff linter
-        run: uvx ruff check .
-
-      - name: Run Ruff formatter
-        run: uvx ruff format --check .
+    uses: pschmitt/ci-workflows/.github/workflows/home-assistant-ruff.yaml@main
+    with:
+      uv-v5: true
